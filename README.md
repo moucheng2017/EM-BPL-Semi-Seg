@@ -40,13 +40,16 @@ path_to_dataset
     └───imgs # (H x W x D) nii.gz* isotropic nifti unseen volumes of scans
     └───lbls # (H x W x D) nii.gz* isotropic nifti labels of unseen scans
 ```
-Then to train the model, use:
+
+Then to train the model with default hyperparameter, use:
    ```shell
    cd EMSSL
-   python MainSemi.py
+   python Run.py
    --data 'path/to/your/numpy_dataset' 
    --log_flat 'your log flag'
+   --mu 0.5
    ```
+However, we recommand users to tune --mu
 
 ### Citation
 
