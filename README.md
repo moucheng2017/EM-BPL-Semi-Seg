@@ -104,8 +104,7 @@ is still approximated as min [(1 - mu_prior) / 3, mu_prior / 3].
 Other alternative implementations with suitable assumptions could also be used to simplify the K-L loss.
 
 ### On the learnt threshold
-We learn each threshold scalar for each image in the current implementation. However, previously, we found
-mean threshold across batch can bring in good regularisation effect too.
+We learn each threshold scalar for each image in the current implementation before we average them across batch. See the output of libs.Train3D.calculate_kl_loss
 
 ### Example Use:
 Task06_Lung from medicaldecathlon.com
