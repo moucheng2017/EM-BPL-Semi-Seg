@@ -1,15 +1,20 @@
-import glob
-import os
 import torch
 import random
 import math
 import numpy as np
 import scipy.ndimage
-import nibabel as nib
+from skimage.transform import resize
 import numpy.ma as ma
 
-from torch.utils import data
-from torch.utils.data import Dataset
+
+def norm95(image):
+    # calculate the historgram of intensities of image and keep the top 95% then use mean of those to calculate
+    # sort the array of intensities:
+    image95 = image.flatten()
+    size = len(image95)
+    image95 = sorted(image95)[int(math.ceil((size * 5) / 100))-1:]
+    image = (image - np.nanmean(image95) + 1e-10) / (np.nanstd(image95) + 1e-10)
+    return image
 
 
 class RandomZoom(object):
@@ -17,43 +22,19 @@ class RandomZoom(object):
     # We zoom out the foreground parts when labels are available
     # We also zoom out the slices in the start and the end
     def __init__(self,
-                 zoom_ratio_h=(0.5, 0.7),
-                 zoom_ratio_w=(0.5, 0.7)):
+                 zoom_ratio_h=(0.5, 0.8),
+                 zoom_ratio_w=(0.5, 0.8),
+                 debug=0):
 
         self.zoom_ratio_h = zoom_ratio_h
         self.zoom_ratio_w = zoom_ratio_w
+        self.debug = debug
 
-    # def get_sample_centre(self,
-    #                       label):
-    #     This one is buggy now not used and even if it was correct, it would be limited to only labelled data
-    #     # get height and width of label:
-    #     h, w = np.shape(label)
-    #     new_size = h // self.upsample_ratio
-    #
-    #     # half of the new size:
-    #     cropping_edge = int(new_size)
-    #
-    #     # make sure that label do not go above the range:
-    #     label_available = label[0:h-cropping_edge, 0:w-cropping_edge]
-    #
-    #     # locations map:
-    #     all_foreground_locs = np.argwhere((label_available > 0))
-    #
-    #     if not all_foreground_locs:
-    #         all_foreground_locs = len(all_foreground_locs)
-    #
-    #     # select a random foreground out of it:
-    #     foreground_location = np.random.choice(len(all_foreground_locs))
-    #
-    #     # foreground locations:
-    #     x, y = list(all_foreground_locs)[foreground_location]
-    #     return x, y
-
-    def sample_positions(self, label):
+    def sample_positions(self, image):
         ratio_h = round(random.uniform(self.zoom_ratio_h[0], self.zoom_ratio_h[1]), 2)
         ratio_w = round(random.uniform(self.zoom_ratio_w[0], self.zoom_ratio_w[1]), 2)
         # get image size upper bounds:
-        h, w = np.shape(label)[-2], np.shape(label)[-1]
+        h, w = np.shape(image)[-2], np.shape(image)[-1]
         # get cropping upper bounds:
         upper_h, upper_w = int(h*(1-ratio_h)), int(w*(1-ratio_w))
         # sampling positions:
@@ -80,82 +61,167 @@ class RandomZoom(object):
 
         # crop again to makes the zoomed image has the same size as the original image size:
         h, w = np.shape(label)[-2], np.shape(label)[-1]
-
         image_zoomed, label_zoomed = image_zoomed[0:h, 0:w], label_zoomed[0:h, 0:w]
-
         h2, w2 = np.shape(label_zoomed)[-2], np.shape(label_zoomed)[-1]
+
         assert h2 == h
         assert w2 == w
 
         return image_zoomed, label_zoomed
 
 
+class RandomCrop(object):
+    def __init__(self,
+                 output_shape
+                 ):
+        self.output_shape = output_shape
+
+    def crop_x(self, x):
+        # print(np.shape(x))
+        d, h, w = np.shape(x)
+        sample_position_d = random.randint(0, d - 1 - self.output_shape[0])
+        sample_position_h = random.randint(0, h - 1 - self.output_shape[1])
+        sample_position_w = random.randint(0, w - 1 - self.output_shape[2])
+
+        x = x[sample_position_d:sample_position_d+self.output_shape[0],
+              sample_position_h:sample_position_h+self.output_shape[1],
+              sample_position_w:sample_position_w+self.output_shape[2]]
+
+        return x
+
+    def crop_xy(self, x, y):
+        d, h, w = np.shape(x)
+        sample_position_d = random.randint(0, d - 1 - self.output_shape[0])
+        sample_position_h = random.randint(0, h - 1 - self.output_shape[1])
+        sample_position_w = random.randint(0, w - 1 - self.output_shape[2])
+
+        x = x[sample_position_d:sample_position_d+self.output_shape[0],
+              sample_position_h:sample_position_h+self.output_shape[1],
+              sample_position_w:sample_position_w+self.output_shape[2]]
+
+        y = y[sample_position_d:sample_position_d+self.output_shape[0],
+              sample_position_h:sample_position_h+self.output_shape[1],
+              sample_position_w:sample_position_w+self.output_shape[2]]
+
+        return x, y
+
+
 class RandomSlicingOrthogonal(object):
     def __init__(self,
-                 discarded_slices=5,
-                 zoom=True,
-                 sampling_weighting_slope=0):
+                 output_size=(160, 160),
+                 full_orthogonal=0,
+                 # discarded_slices=5,
+                 zoom=1,
+                 # sampling_weighting_slope=0
+                 ):
         '''
         cropping_d: 3 d dimension of cropped sub volume cropping on h x w
         cropping_h: 3 d dimension of cropped sub volume cropping on w x d
         cropping_w: 3 d dimension of cropped sub volume cropping on h x d
         '''
-        self.discarded_slices = discarded_slices
+        # self.discarded_slices = discarded_slices
         self.zoom = zoom
+        self.full_orthogonal = full_orthogonal
+
+        self.new_size_h = output_size[0]
+        self.new_size_w = output_size[1]
 
         # Over sampling the slices on the two ends because they contain small difficult vessels
         # We give the middle slice the lowest weight and the slices at the two very ends the highest weights
 
-        weight_middle_slice = 1
-        default_no_slices = 512
-        weight_end_slices = sampling_weighting_slope*0.5*default_no_slices + weight_middle_slice
-        sampling_weights_prob = [int(abs((i-0.5*default_no_slices))*sampling_weighting_slope+default_no_slices) / weight_end_slices for i in range(default_no_slices)]
-        self.sampling_weights_prob = [i / sum(sampling_weights_prob) for i in sampling_weights_prob] # normalise so everything adds up to 1
+        # weight_middle_slice = 1
+        # default_no_slices = 512
+        # weight_end_slices = sampling_weighting_slope*0.5*default_no_slices + weight_middle_slice
+        # sampling_weights_prob = [int(abs((i-0.5*default_no_slices))*sampling_weighting_slope+default_no_slices) / weight_end_slices for i in range(default_no_slices)]
+        # self.sampling_weights_prob = [i / sum(sampling_weights_prob) for i in sampling_weights_prob] # normalise so everything adds up to 1
 
-        if self.zoom is True:
+        if self.zoom == 1:
             self.zoom_aug = RandomZoom()
 
     def crop(self, *volumes):
 
-        outputs = {"plane_d": [],
-                   "plane_h": [],
-                   "plane_w": []}
+        if self.full_orthogonal == 1:
+            outputs = {"plane_d": [],
+                       "plane_h": [],
+                       "plane_w": []}
 
-        for each_input in volumes:
+            d, h, w = np.shape(volumes[0])
 
-            newd, newh, neww = np.shape(each_input)
+            sample_position_d = random.randint(0, d - 1)
+            sample_position_h = random.randint(0, h - 1)
+            sample_position_w = random.randint(0, w - 1)
 
-            sample_position_d_d = np.random.choice(np.arange(newd), 1, p=self.sampling_weights_prob)
-            sample_position_h_h = np.random.choice(np.arange(newh), 1, p=self.sampling_weights_prob)
-            sample_position_w_w = np.random.choice(np.arange(neww), 1, p=self.sampling_weights_prob)
+            for i, each_input in enumerate(volumes):
+                if i == 0:
+                    outputs["plane_d"].append(resize(np.squeeze(each_input[sample_position_d, :, :]), (self.new_size_h, self.new_size_w), order=1))
+                    outputs["plane_h"].append(resize(np.squeeze(each_input[:, sample_position_h, :]), (self.new_size_h, self.new_size_w), order=1))
+                    outputs["plane_w"].append(resize(np.squeeze(each_input[:, :, sample_position_w]), (self.new_size_h, self.new_size_w), order=1))
+                elif i == 1:
+                    outputs["plane_d"].append(resize(np.squeeze(each_input[sample_position_d, :, :]), (self.new_size_h, self.new_size_w), order=0))
+                    outputs["plane_h"].append(resize(np.squeeze(each_input[:, sample_position_h, :]), (self.new_size_h, self.new_size_w), order=0))
+                    outputs["plane_w"].append(resize(np.squeeze(each_input[:, :, sample_position_w]), (self.new_size_h, self.new_size_w), order=0))
 
-            outputs["plane_d"].append(np.squeeze(each_input[sample_position_d_d, :, :]))
-            outputs["plane_h"].append(np.squeeze(each_input[:, sample_position_h_h, :]))
-            outputs["plane_w"].append(np.squeeze(each_input[:, :, sample_position_w_w]))
+            if self.zoom is True:
+                if random.random() >= 0.5:
+                    outputs["plane_d"][0], outputs["plane_d"][1] = self.zoom_aug.forward(outputs["plane_d"][0], outputs["plane_d"][1])
+                    outputs["plane_h"][0], outputs["plane_h"][1] = self.zoom_aug.forward(outputs["plane_h"][0], outputs["plane_h"][1])
+                    outputs["plane_w"][0], outputs["plane_w"][1] = self.zoom_aug.forward(outputs["plane_w"][0], outputs["plane_w"][1])
 
-        if self.zoom is True:
-            if random.random() >= 0.5:
-                outputs["plane_d"][0], outputs["plane_d"][1] = self.zoom_aug.forward(outputs["plane_d"][0], outputs["plane_d"][1])
-                outputs["plane_h"][0], outputs["plane_h"][1] = self.zoom_aug.forward(outputs["plane_h"][0], outputs["plane_h"][1])
-                outputs["plane_w"][0], outputs["plane_w"][1] = self.zoom_aug.forward(outputs["plane_w"][0], outputs["plane_w"][1])
+            return outputs
 
-        return outputs
+        elif self.full_orthogonal == 0:
+            outputs = {"plane": []}
+
+            d, h, w = np.shape(volumes[0])
+
+            # sample_position_d = np.random.choice(np.arange(newd), 1, p=self.sampling_weights_prob)
+            # sample_position_h = np.random.choice(np.arange(newh), 1, p=self.sampling_weights_prob)
+            # sample_position_w = np.random.choice(np.arange(neww), 1, p=self.sampling_weights_prob)
+
+            sample_position_d = random.randint(0, d - 1)
+            sample_position_h = random.randint(0, h - 1)
+            sample_position_w = random.randint(0, w - 1)
+
+            roll_a_dice = random.random()
+
+            if roll_a_dice < 0.34:
+                for i, each_input in enumerate(volumes):
+                    if i == 0:
+                        outputs["plane"].append(resize(np.squeeze(each_input[sample_position_d, :, :]), (self.new_size_h, self.new_size_w), order=1))
+                    else:
+                        outputs["plane"].append(resize(np.squeeze(each_input[sample_position_d, :, :]), (self.new_size_h, self.new_size_w), order=0))
+
+            elif roll_a_dice < 0.68:
+                for i, each_input in enumerate(volumes):
+                    if i == 0:
+                        outputs["plane"].append(resize(np.squeeze(each_input[:, sample_position_h, :]), (self.new_size_h, self.new_size_w), order=1))
+                    else:
+                        outputs["plane"].append(resize(np.squeeze(each_input[:, sample_position_h, :]), (self.new_size_h, self.new_size_w), order=0))
+
+            else:
+                for i, each_input in enumerate(volumes):
+                    if i == 0:
+                        outputs["plane"].append(resize(np.squeeze(each_input[:, :, sample_position_w]), (self.new_size_h, self.new_size_w), order=1))
+                    else:
+                        outputs["plane"].append(resize(np.squeeze(each_input[:, :, sample_position_w]), (self.new_size_h, self.new_size_w), order=0))
+
+            if self.zoom == 1:
+                if random.random() >= 0.5:
+                    outputs["plane"][0], outputs["plane"][1] = self.zoom_aug.forward(outputs["plane"][0], outputs["plane"][1])
+
+            return outputs
 
 
 class RandomContrast(object):
-    def __init__(self, bin_range=(100, 255)):
+    def __init__(self, bin_range=(10, 100)):
         # self.bin_low = bin_range[0]
         # self.bin_high = bin_range[1]
         self.bin_range = bin_range
 
     def randomintensity(self, input):
-
         augmentation_flag = np.random.rand()
-
         if augmentation_flag >= 0.5:
-            # bin = np.random.choice(self.bin_range)
             bin = random.randint(self.bin_range[0], self.bin_range[1])
-            # c, d, h, w = np.shape(input)
             c, h, w = np.shape(input)
             image_histogram, bins = np.histogram(input.flatten(), bin, density=True)
             cdf = image_histogram.cumsum()  # cumulative distribution function
@@ -169,7 +235,7 @@ class RandomContrast(object):
 
 
 class RandomGaussian(object):
-    def __init__(self, mean=0, std=0.01):
+    def __init__(self, mean=0, std=0.1):
         self.m = mean
         self.sigma = std
 

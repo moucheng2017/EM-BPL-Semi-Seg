@@ -8,133 +8,17 @@ from os import listdir
 # import Image
 
 import timeit
-import torch.nn as nn
-import torch.nn.functional as F
 
-import glob
 # import tifffile as tiff
-
-from scipy import ndimage
-import random
 
 # from skimage import exposure
 
-from Metrics import segmentation_scores, hd95, preprocessing_accuracy, f1_score
-from PIL import Image
-from torch.utils import data
-
-from Loss import SoftDiceLoss
-
-
-def train_base(labelled_img,
-               labelled_label,
-               labelled_lung,
-               device,
-               model,
-               t=2.0,
-               apply_lung_mask=True,
-               single_channel_label=False):
-
-    train_imgs = labelled_img.to(device=device, dtype=torch.float32)
-    labels = labelled_label.to(device=device, dtype=torch.float32)
-    lung = labelled_lung.to(device=device, dtype=torch.float32)
-
-    if single_channel_label is True:
-        # labels = labels[:, labels.size()[1] // 2, :, :].unsqueeze(1) # middle slice
-        # lung = lung[:, lung.size()[1] // 2, :, :].unsqueeze(1)  # middle slice
-        # labels = labels[:, -1, :, :].unsqueeze(1) # last slice
-        # lung = lung[:, -1, :, :].unsqueeze(1)
-        labels = labels.unsqueeze(1)
-        lung = lung.unsqueeze(1)
-        train_imgs = train_imgs.unsqueeze(1)
-
-    if torch.sum(labels) > 10.0:
-        outputs, cm = model(train_imgs, [1, 1, 1, 1], [1, 1, 1, 1])
-        prob_outputs = torch.softmax(outputs / t, dim=1)
-        prob_outputs = prob_outputs[:, -1, :, :].unsqueeze(1)
-        # prob_outputs, class_output = torch.max(prob_outputs, dim=1)
-
-        if apply_lung_mask is True:
-            lung_mask = (lung > 0.5)
-            prob_outputs_masked = torch.masked_select(prob_outputs, lung_mask)
-            labels_masked = torch.masked_select(labels, lung_mask)
-        else:
-            prob_outputs_masked = prob_outputs
-            labels_masked = labels
-
-        if torch.sum(prob_outputs_masked) > 10.0:
-            loss = SoftDiceLoss()(prob_outputs_masked, labels_masked) + nn.BCELoss(reduction='mean')(prob_outputs_masked.squeeze() + 1e-10, labels_masked.squeeze() + 1e-10)
-        else:
-            loss = 0.0
-
-        class_outputs = (prob_outputs_masked > 0.95).float()
-        train_mean_iu_ = segmentation_scores(labels_masked, class_outputs, 2)
-        train_mean_iu_ = sum(train_mean_iu_) / len(train_mean_iu_)
-    else:
-        train_mean_iu_ = 0.0
-        loss = 0.0
-
-    return loss, train_mean_iu_
-
-
-def validate_base(val_img,
-                  val_lbl,
-                  val_lung,
-                  device,
-                  model,
-                  cm=True):
-
-        val_img = val_img.to(device, dtype=torch.float32)
-        val_lbl = val_lbl.to(device, dtype=torch.float32)
-        val_lung = val_lung.to(device, dtype=torch.float32)
-
-        val_output, _ = model(val_img)
-
-        if cm is False:
-            val_output = torch.sigmoid(val_output)
-            val_output = (val_output > 0.95).float()
-        else:
-            val_output_prob = torch.softmax(val_output, dim=1)
-            val_output = val_output_prob[:, -1, :, :].unsqueeze(1)
-            # val_output, val_class_output = torch.max(val_output_prob, dim=1)
-
-        lung_mask = (val_lung > 0.5)
-
-        val_class_outputs_masked = torch.masked_select(val_output, lung_mask)
-        val_label_masked = torch.masked_select(val_lbl, lung_mask)
-
-        eval_mean_iu_ = segmentation_scores(val_label_masked.squeeze(), val_class_outputs_masked.squeeze(), 2)
-        return eval_mean_iu_
-
-
-def validate_three_planes(validate_loader,
-                          device,
-                          model):
-
-    val_iou_d = []
-    val_iou_h = []
-    val_iou_w = []
-
-    model.eval()
-    with torch.no_grad():
-        iterator_val_labelled = iter(validate_loader)
-
-        for i in range(len(validate_loader)):
-            try:
-                val_dict, _ = next(iterator_val_labelled)
-            except StopIteration:
-                iterator_val_labelled = iter(validate_loader)
-                val_dict, _ = next(iterator_val_labelled)
-
-            val_iou_d.append(validate_base(val_dict["plane_d"][0], val_dict["plane_d"][1], val_dict["plane_d"][2], device, model))
-            val_iou_h.append(validate_base(val_dict["plane_h"][0], val_dict["plane_h"][1], val_dict["plane_h"][2], device, model))
-            val_iou_w.append(validate_base(val_dict["plane_w"][0], val_dict["plane_w"][1], val_dict["plane_w"][2], device, model))
-
-    return {"val d plane": val_iou_d, "val h plane": val_iou_h, "val w plane": val_iou_w}
+from libs.Metrics import segmentation_scores
 
 
 # def stitch_subvolumes():
 # this function is to stich up all subvolume into the whole
+
 
 def segment_whole_volume(model,
                          volume,
@@ -180,14 +64,15 @@ def segment_whole_volume(model,
     subvolume = volume[:, d-train_size[0]:d, h-train_size[1]:h, w-train_size[2]:w]
     subvolume = torch.from_numpy(subvolume).to(device='cuda', dtype=torch.float32)
 
-    # print(subvolume.unsqueeze(0).size())
     subseg, _ = model(subvolume.unsqueeze(0))
+
     if class_no == 2:
         subseg = torch.sigmoid(subseg)
     else:
         subseg = torch.softmax(subseg, dim=1)
+
     segmentation[:, d-train_size[0]:d, h-train_size[1]:h, w-train_size[2]:w] = subseg.squeeze(0).detach().cpu().numpy()
-    # segmentation[:, d-train_size[0]:d, h-train_size[1]:h, w-train_size[2]:w] = subseg.squeeze(0)
+
     return segmentation
 
 
@@ -210,86 +95,6 @@ def ensemble_segmentation(model_path, volume, train_size=[192, 192, 192], class_
     else:
         _, segmentation = torch.max(segmentation, dim=1)
     return segmentation
-
-
-def sigmoid_rampup(current, rampup_length, limit):
-    """Exponential rampup from https://arxiv.org/abs/1610.02242"""
-    phase = 1.0 - current / rampup_length
-    weight = float(np.exp(-5.0 * phase * phase))
-    if weight > limit:
-        return float(limit)
-    else:
-        return weight
-
-
-def cyclic_sigmoid_rampup(current, rampup_length, limit):
-    # calculate the relative current:
-    cyclic_index = current // rampup_length
-    relative_current = current - cyclic_index*rampup_length
-    phase = 1.0 - relative_current / rampup_length
-    weight = float(np.exp(-5.0 * phase * phase))
-    if weight > limit:
-        return float(limit)
-    else:
-        return weight
-
-
-def exp_rampup(current, base, limit):
-    weight = float(base*(1.05**current))
-    if weight > limit:
-        return float(limit)
-    else:
-        weight
-
-
-def linear_rampup(current, rampup_length):
-    """Linear rampup"""
-    assert current >= 0 and rampup_length >= 0
-    if current >= rampup_length:
-        return 1.0
-    else:
-        return current / rampup_length
-
-
-def evaluate(validateloader, model, device, model_name, class_no, dilation):
-
-    model.eval()
-    with torch.no_grad():
-
-        validate_iou = []
-        validate_h_dist = []
-
-        for i, (val_images, val_label, val_lung, imagename) in enumerate(validateloader):
-            print(val_images.size())
-            val_img = val_images.to(device=device, dtype=torch.float32)
-            # val_img = val_images.to(device=device, dtype=torch.float32).unsqueeze(1)
-            val_label = val_label.to(device=device, dtype=torch.float32)
-            val_lung = val_lung.to(device=device, dtype=torch.float32)
-
-            if 'CCT' in model_name or 'cct' in model_name:
-                val_outputs, _ = model(val_img)
-            elif 'expert' in model_name:
-                val_outputs = model(val_img, dilation)
-            else:
-                val_outputs, _ = model(val_img)
-
-            if class_no == 2:
-                val_outputs = torch.sigmoid(val_outputs)
-                val_class_outputs = (val_outputs > 0.95).float()
-            else:
-                _, val_class_outputs = torch.max(val_outputs, dim=1)
-
-            lung_mask = (val_lung > 0.5)
-            val_class_outputs_masked = torch.masked_select(val_class_outputs, lung_mask)
-            val_label_masked = torch.masked_select(val_label, lung_mask)
-
-            eval_mean_iu_ = segmentation_scores(val_label_masked.squeeze(), val_class_outputs_masked.squeeze(), class_no)
-            validate_iou.append(eval_mean_iu_)
-            if (val_class_outputs == 1).sum() > 1 and (val_label == 1).sum() > 1:
-                v_dist_ = hd95(val_class_outputs.squeeze(), val_label.squeeze(), class_no)
-                validate_h_dist.append(v_dist_)
-
-    return validate_iou, validate_h_dist
 
 
 def test(saved_information_path,

@@ -1,13 +1,12 @@
 ### News
+[2023 Feb 28th] We added a new simplified implementation of bayesian pseudo label to avoid hyper-parameter searching of priors. In the new implementation, we only learn the variance of the distribution of the threshold
+and we approxiamte the mean directly. See details in libs.loss.kld_loss. To test it, in your config file (see an example in config/exp.yaml), please set up the train.threshold_flag as 1 and train.learn_threshold as 1.
+However, this simplification hasn't been thoroughly tested yet on a broad range of applications, we are doing more testing now.
+
 [2022 Sep 21th] Bayesian Pseudo Label was selected and shortlisted for Young Scientist Award (Best Paper) at MICCAI 2022 main conference (15 finalists / 1825 submissions).
 
-[2022 Oct 21th] We release the implementation of the model and a training script with three improvements. The three improvements are:
-a) 2.5D training, each iteration trains slices sampled from three orthogonal planes of the input volume;
-b) augmentation techniques such as cutout, random contrast, random zoom in and random Gaussian noises, different augmentation are weighted sum with weighs sampled from Dirichlet distribution;
-c) new training schedule, 50 steps only supervised learning then linear warm-up of the weighting for unsupervised learning on pseudo labels.
-
 ### Introduction
-This repository is an implementation of our MICCAI 2022 paper (Runner-up for the best paper (Young Scientist Award)) '[Bayesian Pseudo Labels: Expectation Maximization and Maximization for Robust and Efficient Semi-Supervised Segmentation](https://arxiv.org/abs/2208.04435)'. This code base was written and maintained by [Moucheng Xu](https://moucheng2017.github.io/)
+This repository is an exampler implementation of our MICCAI 2022 paper on 3D binary segmentation (Runner-up for the best paper (Young Scientist Award)) '[Bayesian Pseudo Labels: Expectation Maximization and Maximization for Robust and Efficient Semi-Supervised Segmentation](https://arxiv.org/abs/2208.04435)'. This code base was written and maintained by [Moucheng Xu](https://moucheng2017.github.io/)
 
 ### Pseudo Labelling as Expectation Maximization (EM)
 We focus on binary case here that output of a network model is single channel and normalised by Sigmoid function. 
@@ -16,7 +15,7 @@ The original pseudo labelling is an empirical estimation of E-step for estimatin
 We further simplify the graphical model by using only the confidence threshold as a latent variable.
 See the illustration below:
 
-![PL vs EM](pics/BPL_GM.png "Plot.")
+![PL vs EM](pics/main_method.png "Plot.")
 
 
 ### Bayesian Pseudo Labels
@@ -28,28 +27,84 @@ The two key differences between BPL and VAE are: 1) BPL has only one latent vari
 
 ### Installation and Usage
 This repository is based on PyTorch 1.4. To use this code, please first clone the repo and install the enviroment.
-In order to use this code on your dataset, you will have to resample and store all of your scans to isotropic (H=W=D) and prepare your dataset in a structure following:
+In order to use this code on your own dataset, if the volumetric data is in (H x W x D), please set up the flag "transpose_dim" in your config yaml file as 1. If the data is in (D x H x W), set "transpose_dim" as 0.
+you will also have to prepare your dataset in a structure following:
+
 ```
 path_to_dataset
 └───labelled
-|   └───imgs # (H x W x D) nii.gz* isotropic nifti volumes of scans
-|   └───lbls # (H x W x D) nii.gz* isotropic nifti volumes of labels 
+|   └───imgs # labelled scans. 
+|   └───lbls # labels 
 └───unlabelled
-|   └───imgs # (H x W x D) nii.gz* isotropic nifti extra volumes of scans
+|   └───imgs # unlabelled scans
 └───test
-    └───imgs # (H x W x D) nii.gz* isotropic nifti unseen volumes of scans
-    └───lbls # (H x W x D) nii.gz* isotropic nifti labels of unseen scans
+    └───imgs # testing scans
+    └───lbls # testing labels
 ```
 
-Then to train the model with default hyperparameter, use:
+Then to train the model, call the following with your own custom yaml config file:
    ```shell
-   cd EMSSL
-   python Run.py
-   --data 'path/to/your/numpy_dataset' 
-   --log_flat 'your log flag'
-   --mu 0.5
+   python main.py \
+   -c config/exp.yaml
    ```
-However, we recommand users to tune --mu
+Here is an example of the config yaml file:
+```
+dataset:
+  name: lungcancer
+  num_workers: 4
+  data_dir: '/SAN/medic/PerceptronHead/data/Task06_Lung' # data directory
+  data_format: 'nii' # use nii for nifti, use npy for numpy
+
+logger:
+  tag: 'exp_log'
+
+seed: 1024
+
+model:
+  input_dim: 1 # channel number of the input volume. For example, 1 for CT, 4 for BRATS
+  output_dim: 1 # output channel number, 1 for binary for using Sigmoid
+  width: 8 # number of filters in the first encoder, it doubles in every encoder
+  depth: 3 # number of downsampling encoders
+
+train:
+  transpose_dim: 1 # use 1 for transposing input if input is in: D x H x W. For example, for Task06_Lung from medicaldecathlon, this should be 1
+  optimizer:
+    weight_decay: 0.0005
+  lr: 0.001
+  iterations: 10000 # number of training iterations, it's worth to mention this is different from epoch
+  batch: 1 # batch size of labelled volumes
+  temp: 1.0 # temperature scaling on output, default as 1
+  contrast: True # random contrast augmentation
+  crop_aug: True # random crop augmentation
+  gaussian: True # random gaussian noise augmentation
+  new_size_d: 32 # crop size on depth (number of slices)
+  new_size_w: 256 # crop size on width
+  new_size_h: 256 # crop size on height
+  batch_u: 1 # this has to be zero in supervised setting, if set up larger than 0, semi-supervised learning will be used
+  mu: 0.5 # prior of the mean of the threshold distribution, we automatically scale the standard deviation, see libs.Loss.kld_loss for details
+  learn_threshold: 1 # 0 for using the original fixed pseudo label, 1 for learning pseudo label threshold
+  threshold_flag: 1 # 0 for the original implementation of bayesian pseudo label, 1 for a simplified implementation which approximates mean and learns the variance
+  alpha: 1.0 # weight on the unsupervised learning part if semi-supervised learning is used
+  warmup: 0.1 # ratio between warm-up iterations and total iterations
+  warmup_start: 0.1 # ratio between warm-up starting iteration and total iterations
+
+checkpoint:
+  resume: False # resume training or not
+  checkpoint_path: '/some/path/to/saved/model' # checkpoint path
+```
+
+### Different implementations of K-L loss of Bayesian Pseudo Labels:
+There are two implementations of kl loss of the threshold of the pseudo labels. See the exact KL loss implementations in libs.Loss.kld_loss
+1. The original implementation with hyperparameter searching of prior of mean (mu) (MICCAI version). To use the original Bayesian pseudo labels, set up "learn_threshold" as 1
+and "threshold_flag" as 0. The standard deviation prior is approximated as min [(1 - mu_prior) / 3, mu_prior / 3]. 
+
+2. The simplified Bayesian pseudo label without hyperparameter searching of prior of mean (mu). The mu_prior is approximated as Exp[.] of prediction probability. The standard deviation prior
+is still approximated as min [(1 - mu_prior) / 3, mu_prior / 3]. 
+
+Other alternative implementations with suitable assumptions could also be used to simplify the K-L loss.
+
+### Example Use:
+Task06_Lung from medicaldecathlon.com
 
 ### Citation
 

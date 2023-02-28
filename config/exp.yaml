@@ -1,0 +1,49 @@
+dataset:
+  name: lungcancer
+  num_workers: 4
+  data_dir: '/SAN/medic/PerceptronHead/data/Task06_Lung' # data directory
+  data_format: 'nii' # use nii for nifti, use npy for numpy
+
+logger:
+  tag: 'exp_log'
+
+seed: 1024
+
+model:
+  input_dim: 1 # channel number of the input volume. For example, 1 for CT, 4 for BRATS
+  output_dim: 1 # output channel number, 1 for binary for using Sigmoid
+  width: 8 # number of filters in the first encoder, it doubles in every encoder
+  depth: 3 # number of downsampling encoders
+
+train:
+  transpose_dim: 1 # use 1 for transposing input if input is in: D x H x W. For example, for Task06_Lung from medicaldecathlon, this should be 1
+  optimizer:
+    weight_decay: 0.0005
+  lr: 0.001
+  iterations: 10000 # number of training iterations, it's worth to mention this is different from epoch
+  batch: 1 # batch size of labelled volumes
+  temp: 1.0 # temperature scaling on output, default as 1
+  contrast: True # random contrast augmentation
+  crop_aug: True # random crop augmentation
+  gaussian: True # random gaussian noise augmentation
+  new_size_d: 32 # crop size on depth (number of slices)
+  new_size_w: 256 # crop size on width
+  new_size_h: 256 # crop size on height
+  batch_u: 1 # this has to be zero in supervised setting, if set up larger than 0, semi-supervised learning will be used
+  mu: 0.5 # prior of the mean of the threshold distribution, we automatically scale the standard deviation, see libs.Loss.kld_loss for details
+  learn_threshold: 1 # 0 for using the original fixed pseudo label, 1 for learning pseudo label threshold
+  threshold_flag: 1 # 0 for the original implementation of bayesian pseudo label, 1 for a simplified implementation which approximates mean and learns the variance
+  alpha: 1.0 # weight on the unsupervised learning part if semi-supervised learning is used
+  warmup: 0.1 # ratio between warm-up iterations and total iterations
+  warmup_start: 0.1 # ratio between warm-up starting iteration and total iterations
+
+checkpoint:
+  resume: False # resume training or not
+  checkpoint_path: '/some/path/to/saved/model' # checkpoint path
+
+
+
+
+
+
+
