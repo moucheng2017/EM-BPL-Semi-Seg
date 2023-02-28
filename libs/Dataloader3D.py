@@ -65,7 +65,10 @@ class CustomDataset3D(Dataset):
             if len(np.shape(image)) == 3: # Lung cancer
                 image = np.transpose(image, (2, 0, 1))
             elif len(np.shape(image)) == 4: # BRATS
-                image = np.transpose(image, (3, 0, 1, 2))
+                # print(np.shape(image))
+                image = np.transpose(image, (3, 2, 0, 1))
+                # print(np.shape(image))
+                # print(np.shape(image))
             else:
                 raise NotImplementedError
 

@@ -77,31 +77,57 @@ class RandomCrop(object):
         self.output_shape = output_shape
 
     def crop_x(self, x):
-        # print(np.shape(x))
-        d, h, w = np.shape(x)
-        sample_position_d = random.randint(0, d - 1 - self.output_shape[0])
-        sample_position_h = random.randint(0, h - 1 - self.output_shape[1])
-        sample_position_w = random.randint(0, w - 1 - self.output_shape[2])
 
-        x = x[sample_position_d:sample_position_d+self.output_shape[0],
-              sample_position_h:sample_position_h+self.output_shape[1],
-              sample_position_w:sample_position_w+self.output_shape[2]]
+        sample_position_d = random.randint(0, np.shape(x)[-3] - 1 - self.output_shape[0])
+        sample_position_h = random.randint(0, np.shape(x)[-2] - 1 - self.output_shape[1])
+        sample_position_w = random.randint(0, np.shape(x)[-1] - 1 - self.output_shape[2])
+
+        if len(np.shape(x)) == 3:
+
+            x = x[sample_position_d:sample_position_d+self.output_shape[0],
+                  sample_position_h:sample_position_h+self.output_shape[1],
+                  sample_position_w:sample_position_w+self.output_shape[2]]
+
+        elif len(np.shape(x)) == 4:
+
+            x = x[:,
+                sample_position_d:sample_position_d + self.output_shape[0],
+                sample_position_h:sample_position_h + self.output_shape[1],
+                sample_position_w:sample_position_w + self.output_shape[2]]
+
+        else:
+            raise NotImplementedError
 
         return x
 
     def crop_xy(self, x, y):
-        d, h, w = np.shape(x)
-        sample_position_d = random.randint(0, d - 1 - self.output_shape[0])
-        sample_position_h = random.randint(0, h - 1 - self.output_shape[1])
-        sample_position_w = random.randint(0, w - 1 - self.output_shape[2])
 
-        x = x[sample_position_d:sample_position_d+self.output_shape[0],
-              sample_position_h:sample_position_h+self.output_shape[1],
-              sample_position_w:sample_position_w+self.output_shape[2]]
+        sample_position_d = random.randint(0, np.shape(x)[-3] - 1 - self.output_shape[0])
+        sample_position_h = random.randint(0, np.shape(x)[-2] - 1 - self.output_shape[1])
+        sample_position_w = random.randint(0, np.shape(x)[-1] - 1 - self.output_shape[2])
 
-        y = y[sample_position_d:sample_position_d+self.output_shape[0],
-              sample_position_h:sample_position_h+self.output_shape[1],
-              sample_position_w:sample_position_w+self.output_shape[2]]
+        if len(np.shape(x)) == 3:
+
+            x = x[sample_position_d:sample_position_d+self.output_shape[0],
+                  sample_position_h:sample_position_h+self.output_shape[1],
+                  sample_position_w:sample_position_w+self.output_shape[2]]
+
+            y = y[sample_position_d:sample_position_d+self.output_shape[0],
+                  sample_position_h:sample_position_h+self.output_shape[1],
+                  sample_position_w:sample_position_w+self.output_shape[2]]
+
+        elif len(np.shape(x)) == 4:
+
+            x = x[:, sample_position_d:sample_position_d + self.output_shape[0],
+                sample_position_h:sample_position_h + self.output_shape[1],
+                sample_position_w:sample_position_w + self.output_shape[2]]
+
+            y = y[sample_position_d:sample_position_d + self.output_shape[0],
+                sample_position_h:sample_position_h + self.output_shape[1],
+                sample_position_w:sample_position_w + self.output_shape[2]]
+
+        else:
+            raise NotImplementedError
 
         return x, y
 
@@ -222,12 +248,24 @@ class RandomContrast(object):
         augmentation_flag = np.random.rand()
         if augmentation_flag >= 0.5:
             bin = random.randint(self.bin_range[0], self.bin_range[1])
-            c, h, w = np.shape(input)
-            image_histogram, bins = np.histogram(input.flatten(), bin, density=True)
-            cdf = image_histogram.cumsum()  # cumulative distribution function
-            cdf = 255 * cdf / cdf[-1]  # normalize
-            output = np.interp(input.flatten(), bins[:-1], cdf)
-            output = np.reshape(output, (c, h, w))
+
+            if len(np.shape(input)) == 3:
+                c, h, w = np.shape(input)
+                image_histogram, bins = np.histogram(input.flatten(), bin, density=True)
+                cdf = image_histogram.cumsum()  # cumulative distribution function
+                cdf = 255 * cdf / cdf[-1]  # normalize
+                output = np.interp(input.flatten(), bins[:-1], cdf)
+                output = np.reshape(output, (c, h, w))
+            elif len(np.shape(input)) == 4:
+                c, d, h, w = np.shape(input)
+                image_histogram, bins = np.histogram(input.flatten(), bin, density=True)
+                cdf = image_histogram.cumsum()  # cumulative distribution function
+                cdf = 255 * cdf / cdf[-1]  # normalize
+                output = np.interp(input.flatten(), bins[:-1], cdf)
+                output = np.reshape(output, (c, d, h, w))
+            else:
+                raise NotImplementedError
+
         else:
             output = input
 
