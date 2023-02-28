@@ -28,7 +28,8 @@ def kld_loss(raw_output, mu, logvar, mu_prior, flag):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         threshold = eps * std + mu
-        threshold = torch.clamp(threshold, min=0., max=1.)
+        if threshold.mean() < (mu_prior - 3*prior_std) or threshold.mean() > (mu_prior + 3*prior_std):
+            threshold = 0.5 * torch.ones_like(logvar).cuda()
 
     elif flag == 1:
         # we approximate the mean and we don't learn the mean but we still learn the std via log var
@@ -43,7 +44,8 @@ def kld_loss(raw_output, mu, logvar, mu_prior, flag):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         threshold = eps * std + mu_prior
-        threshold = torch.clamp(threshold, min=0., max=1.)
+        if threshold.mean() < (mu_prior - 3*prior_std) or threshold.mean() > (mu_prior + 3*prior_std):
+            threshold = 0.5 * torch.ones_like(logvar).cuda()
 
     else:
         raise NotImplementedError
