@@ -18,17 +18,19 @@ from scipy.ndimage import distance_transform_edt
 
 def kld_loss(raw_output, mu, logvar, mu_prior, flag):
 
+    gamma = 2.
+
     if flag == 0:
         # calculate the prior var:
-        prior_std_upper = (1 - mu_prior) / 3. # mean + 2*sigma <= 1.0
-        prior_std_lower = (mu_prior - 0.0) / 3. # mean - 2*sigma >= 0.0
+        prior_std_upper = (1 - mu_prior) / gamma # mean + 2*sigma <= 1.0
+        prior_std_lower = (mu_prior - 0.0) / gamma # mean - 2*sigma >= 0.0
         prior_std = min(prior_std_lower, prior_std_upper)
         loss = -0.5*(1 + logvar - 2*math.log(prior_std) - (logvar.exp() + (mu - mu_prior)**2) / prior_std**2).mean()
 
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         threshold = eps * std + mu
-        if threshold.mean() < (mu_prior - 3*prior_std) or threshold.mean() > (mu_prior + 3*prior_std):
+        if threshold.mean() < (mu_prior - gamma*prior_std) or threshold.mean() > (mu_prior + gamma*prior_std):
             threshold = 0.5 * torch.ones_like(logvar).cuda()
 
     elif flag == 1:
@@ -36,15 +38,15 @@ def kld_loss(raw_output, mu, logvar, mu_prior, flag):
         prob = torch.sigmoid(raw_output)
         mu_prior = prob.mean()
 
-        prior_std_upper = (1 - mu_prior) / 3. # mean + 2*sigma <= 1.0
-        prior_std_lower = (mu_prior - 0.0) / 3. # mean - 2*sigma >= 0.0
+        prior_std_upper = (1 - mu_prior) / gamma # mean + 2*sigma <= 1.0
+        prior_std_lower = (mu_prior - 0.0) / gamma # mean - 2*sigma >= 0.0
         prior_std = min(prior_std_lower, prior_std_upper)
         loss = -0.5*(1 + logvar - 2*math.log(prior_std) - logvar.exp() / prior_std**2).mean()
 
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         threshold = eps * std + mu_prior
-        if threshold.mean() < (mu_prior - 3*prior_std) or threshold.mean() > (mu_prior + 3*prior_std):
+        if threshold.mean() < (mu_prior - gamma*prior_std) or threshold.mean() > (mu_prior + gamma*prior_std):
             threshold = 0.5 * torch.ones_like(logvar).cuda()
 
     else:
