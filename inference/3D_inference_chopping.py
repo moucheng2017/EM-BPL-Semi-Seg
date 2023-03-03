@@ -9,7 +9,7 @@ import argparse
 import nibabel as nib
 import torch
 from pathlib import Path
-sys.path.append('../..')
+sys.path.append('..')
 import matplotlib.pyplot as plt
 from skimage.transform import resize
 

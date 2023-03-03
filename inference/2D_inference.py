@@ -1,7 +1,7 @@
 import nibabel
 import sys
+sys.path.append("")
 sys.path.append("..")
-sys.path.append("../..")
 from skimage.transform import resize
 import torch
 import numpy as np

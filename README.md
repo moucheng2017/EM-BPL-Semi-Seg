@@ -1,7 +1,4 @@
 ### News
-[2023 Feb 28th] We added a new simplified implementation of bayesian pseudo label to avoid hyper-parameter searching of priors. In the new implementation, we only learn the variance of the distribution of the threshold
-and we approxiamte the mean directly. See details in libs.loss.kld_loss. To test it, in your config file (see an example in config/exp.yaml), please set up the train.threshold_flag as 1 and train.learn_threshold as 1.
-However, this simplification hasn't been thoroughly tested yet on a broad range of applications, we are doing more testing now.
 
 [2022 Sep 21th] Bayesian Pseudo Label was selected and shortlisted for Young Scientist Award (Best Paper) at MICCAI 2022 main conference (15 finalists / 1825 submissions).
 
@@ -15,15 +12,26 @@ The original pseudo labelling is an empirical estimation of E-step for estimatin
 We further simplify the graphical model by using only the confidence threshold as a latent variable.
 See the illustration below:
 
-![PL vs EM](pics/main_method.png "Plot.")
+![](pics/main_method.png "Plot.")
 
 
 ### Bayesian Pseudo Labels
 Bayesian pseudo label (BPL) is a probabilistic generalisation of pseudo labelling via Bayes rule. Because the full E-step is intractable (more details in our paper), BPL estimates the maximum likelihood of labels of unlabelled data with variational inference. The comparison between Bayesian pseudo label and Variational auto encoder is illustrated beneath: 
 
-![BPL vs VAE](pics/BPL_VAE.png "Plot.")
+![](pics/BPL_VAE.png "Plot.")
 
 The two key differences between BPL and VAE are: 1) BPL has only one latent variable which has a clear prior, while VAE has high dimensional latent variables without a clear prior; 2) VAE does MAP estimation of reconstruction of input image, while BPL does MAP estimation of unseen label of input image.
+
+
+### Results
+The beneath picture is a plot of the learnt threshold with a prior of an univariate Gaussian (mean=0.5, std=0.16). X-axis: training iterations; Y-axis: threshold. 
+![](pics/learnt_threshold.png)
+
+The beneath picture is a plot of the training curves of BPL (Blue) and supervised learning (Red) on
+a binary segmentation of 3D brain tumour task on Task01 Brain Tumour from Medical Decathlon website http://medicaldecathlon.com/. We used case 1-8 from training data as labelled training data
+and we kept the rest of the original data as testing data. We used all of the unlabelled testing data as unlabelled training data. 
+The training curve looks noisy because the batch size is 1, we suggest future users to use large batch size if you have big GPU to avoid noisy training.
+![](pics/train_iu_bpl_baseline.png)
 
 ### Installation and Usage
 This repository is based on PyTorch 1.4. To use this code, please first clone the repo and install the enviroment.
