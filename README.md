@@ -23,20 +23,24 @@ Bayesian pseudo label (BPL) is a probabilistic generalisation of pseudo labellin
 The two key differences between BPL and VAE are: 1) BPL has only one latent variable which has a clear prior, while VAE has high dimensional latent variables without a clear prior; 2) VAE does MAP estimation of reconstruction of input image, while BPL does MAP estimation of unseen label of input image.
 
 
-### Results
-The beneath picture is a plot of the learnt threshold with a prior of an univariate Gaussian (mean=0.5, std=0.16). X-axis: training iterations; Y-axis: threshold. 
-![](pics/learnt_threshold.png)
-
+### Exemplary Results
 The beneath picture is a plot of the training curves of BPL (Blue) and supervised learning (Red) on
 a binary segmentation of 3D brain tumour task on Task01 Brain Tumour from Medical Decathlon website http://medicaldecathlon.com/. We used case 1-8 from training data as labelled training data
 and we kept the rest of the original data as testing data. We used all of the unlabelled testing data as unlabelled training data. 
 The training curve looks noisy because the batch size is 1, we suggest future users to use large batch size if you have big GPU to avoid noisy training.
 ![](pics/train_iu_bpl_baseline.png)
 
-### Installation and Usage
+The beneath picture is a plot of the learnt threshold with a prior of an univariate Gaussian (mean=0.5, std=0.16). X-axis: training iterations; Y-axis: threshold. 
+![](pics/learnt_threshold.png)
+
+### Installation 
 This repository is based on PyTorch 1.4. To use this code, please first clone the repo and install the enviroment.
-In order to use this code on your own dataset, if the volumetric data is in (H x W x D), please set up the flag "transpose_dim" in your config yaml file as 1. If the data is in (D x H x W), set "transpose_dim" as 0.
-you will also have to prepare your dataset in a structure following:
+
+### Prepare the datasets
+This code base is for 3D volumetric data sets. If each of your scans is in (H x W x D), please set up the flag "transpose_dim" in your config yaml file as 1. 
+If each scan is in (D x H x W), set "transpose_dim" as 0. This code base works either numpy or nifti data formats. To use numpy, set up the
+flag "dataset.data_format" as 'npy', to use nifity, set up the flag "dataset.data_format" as 'nii'. 
+You also need to prepare your dataset in a structure following:
 
 ```
 path_to_dataset
@@ -50,7 +54,8 @@ path_to_dataset
     └───lbls # testing labels
 ```
 
-Then to train the model, call the following with your own custom yaml config file:
+### Training and config files:
+Run the following with your own custom yaml config file:
    ```shell
    python main.py \
    -c config/exp.yaml
@@ -107,7 +112,7 @@ There are two implementations of kl loss of the threshold of the pseudo labels. 
 and "threshold_flag" as 0. The standard deviation prior is approximated as min [(1 - mu_prior) / 3, mu_prior / 3]. 
 
 2. The simplified Bayesian pseudo label without hyperparameter searching of prior of mean (mu). The mu_prior is approximated as Exp[.] of prediction probability. The standard deviation prior
-is still approximated as min [(1 - mu_prior) / 3, mu_prior / 3]. 
+is still approximated as min [(1 - mu_prior) / 3, mu_prior / 3]. However, this implementation has not been fully tested. 
 
 Other alternative implementations with suitable assumptions could also be used to simplify the K-L loss.
 
