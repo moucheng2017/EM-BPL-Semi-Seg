@@ -119,8 +119,8 @@ Other alternative implementations with suitable assumptions could also be used t
 ### On the learnt threshold
 We learn each threshold scalar for each image in the current implementation before we average them across batch. See the output of libs.Train3D.calculate_kl_loss
 
-### Example Use:
-Task06_Lung from medicaldecathlon.com
+### Example uses:
+This code base has been tested on datasets downloaded from Medical Segmentation Decathlon: http://medicaldecathlon.com/
 
 ### Citation
 
