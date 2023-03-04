@@ -23,12 +23,14 @@ Bayesian pseudo label (BPL) is a probabilistic generalisation of pseudo labellin
 The two key differences between BPL and VAE are: 1) BPL has only one latent variable which has a clear prior, while VAE has high dimensional latent variables without a clear prior; 2) VAE does MAP estimation of reconstruction of input image, while BPL does MAP estimation of unseen label of input image.
 
 
-### Exemplary Results
-The beneath picture is a plot of the training curves of BPL (Blue) and supervised learning (Red) on
-a binary segmentation of 3D brain tumour task on Task01 Brain Tumour from Medical Decathlon website http://medicaldecathlon.com/. We used case 1-8 from training data as labelled training data
-and we kept the rest of the original data as testing data. We used all of the unlabelled testing data as unlabelled training data. 
-The training curve looks noisy because the batch size is 1, we suggest future users to use large batch size if you have big GPU to avoid noisy training.
-![](pics/train_iu_bpl_baseline.png)
+## Exemplar Results
+The beneath table is the results on binary segmentation of whole tumour using Task01 Brain Tumour. We use the first 8 cases from the original training data
+as labelled training cases and the rest as testing data, we use the original unlabelled testing data as unlabelled training data.
+
+| Test Sizing | 32^3  | 64^3  | 96^3  | 128^3 |
+|-------------|-------|-------|-------|-------|
+| Superivsed  | 61.07 | 66.94 | 70.13 | 72.09 |
+| SegPL-VI    | 64.44 | 71.43 | 73.07 | 74.48 |
 
 The beneath picture is a plot of the learnt threshold with a prior of an univariate Gaussian (mean=0.5, std=0.16). X-axis: training iterations; Y-axis: threshold. 
 ![](pics/learnt_threshold.png)
@@ -120,7 +122,7 @@ Other alternative implementations with suitable assumptions could also be used t
 We learn each threshold scalar for each image in the current implementation before we average them across batch. See the output of libs.Train3D.calculate_kl_loss
 
 ### Example uses:
-This code base has been tested on datasets downloaded from Medical Segmentation Decathlon: http://medicaldecathlon.com/
+This code base has been tested on Task 01 brain tumour data set downloaded from Medical Segmentation Decathlon: http://medicaldecathlon.com/
 
 ### Citation
 
