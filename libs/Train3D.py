@@ -37,7 +37,8 @@ def calculate_sup_loss(lbl,
     train_mean_iu_ = segmentation_scores(lbl.squeeze(), pseudo_label.squeeze(), classes)
 
     return {'loss': loss_sup,
-            'train iou': train_mean_iu_}
+            'train iou': train_mean_iu_,
+            'prob': prob_output.mean()}
 
 
 def train_semi(labelled_img,
@@ -45,9 +46,13 @@ def train_semi(labelled_img,
                model,
                unlabelled_img,
                t=2.0,
-               prior_mu=0.7,
-               learn_threshold=1,
-               flag=1):
+               pri_mu=0.8,
+               pri_std=0.1,
+               flag_post_mu=0,
+               flag_post_std=0,
+               flag_pri_mu=0,
+               flag_pri_std=0
+               ):
 
     # convert data from numpy to tensor:
     inputs = np2tensor_all(**{'img_l': labelled_img,
@@ -58,7 +63,7 @@ def train_semi(labelled_img,
     train_img = get_img(**inputs)
 
     # forward pass:
-    img = train_img.get('train img')
+    img = train_img['train img']
     if len(img.size()) == 4: # for normal 1D channel data of 3d volumetric
         img = img.unsqueeze(1)
     elif len(img.size()) == 5: # for multi-channel data such as BRATS
@@ -67,41 +72,35 @@ def train_semi(labelled_img,
         raise NotImplementedError
 
     outputs_dict = model_forward(model, img)
-    b_l = train_img.get('batch labelled')
-    b_u = train_img.get('batch unlabelled')
+    b_l = train_img['batch labelled']
+    b_u = train_img['batch unlabelled']
 
     # get output for the labelled part:
-    raw_output = outputs_dict.get('segmentation')
+    raw_output = outputs_dict['segmentation']
     raw_output_l, raw_output_u = torch.split(raw_output, [b_l, b_u], dim=0)
 
     # supervised loss:
     sup_loss = calculate_sup_loss(raw_output=raw_output_l,
-                                  lbl=inputs.get('lbl').unsqueeze(1),
+                                  lbl=inputs['lbl'].unsqueeze(1),
                                   temp=t)
 
     # calculate the kl and get the learnt threshold:
-    if learn_threshold > 0:
-        kl_loss = calculate_kl_loss(outputs_dict=outputs_dict,
-                                    b_l=train_img.get('batch labelled'),
-                                    b_u=train_img.get('batch unlabelled'),
-                                    prior_u=prior_mu,
-                                    flag=flag
-                                    )
-        # pseudo label loss:
-        pseudo_loss = calculate_pseudo_loss(raw_output=raw_output_u,
-                                            threshold=kl_loss['threshold'],
-                                            temp=t
-                                            )
+    kl_loss = calculate_kl_loss(outputs_dict=outputs_dict,
+                                b_l=train_img['batch labelled'],
+                                b_u=train_img['batch unlabelled'],
+                                pri_mu=pri_mu,
+                                pri_std=pri_std,
+                                flag_post_mu=flag_post_mu,
+                                flag_post_std=flag_post_std,
+                                flag_pri_mu=flag_pri_mu,
+                                flag_pri_std=flag_pri_std
+                                )
 
-    else:
-        kl_loss = {'loss': torch.zeros(1).cuda(),
-                   'threshold': prior_mu}
-
-        # pseudo label loss:
-        pseudo_loss = calculate_pseudo_loss(raw_output=raw_output_u,
-                                            threshold=prior_mu,
-                                            temp=t
-                                            )
+    # pseudo label loss:
+    pseudo_loss = calculate_pseudo_loss(raw_output=raw_output_u,
+                                        threshold=kl_loss['threshold'],
+                                        temp=t
+                                        )
 
     return {'supervised losses': sup_loss,
             'pseudo losses': pseudo_loss,
@@ -131,7 +130,8 @@ def calculate_pseudo_loss(raw_output,
     else:
         loss_unsup = torch.zeros(1).cuda()
 
-    return {'loss': loss_unsup}
+    return {'loss': loss_unsup,
+            'prob': prob_output.mean()}
 
 
 def train_sup(labelled_img,
@@ -151,9 +151,9 @@ def train_sup(labelled_img,
         raise NotImplementedError
 
     outputs_dict = model_forward(model, img)
-    raw_output = outputs_dict.get('segmentation')
+    raw_output = outputs_dict['segmentation']
     sup_loss = calculate_sup_loss(raw_output=raw_output,
-                                  lbl=inputs.get('lbl').unsqueeze(1),
+                                  lbl=inputs['lbl'].unsqueeze(1),
                                   temp=t)
 
     return {'supervised losses': sup_loss}
@@ -162,20 +162,34 @@ def train_sup(labelled_img,
 def calculate_kl_loss(outputs_dict,
                       b_u,
                       b_l,
-                      prior_u,
-                      flag
+                      pri_mu,
+                      pri_std,
+                      flag_post_mu,
+                      flag_post_std,
+                      flag_pri_mu,
+                      flag_pri_std
                       ):
 
     assert b_u > 0
-    posterior_mu = outputs_dict.get('mu')
-    posterior_logvar = outputs_dict.get('logvar')
+    posterior_mu = outputs_dict['mu']
+    posterior_logvar = outputs_dict['logvar']
     raw_output = outputs_dict['segmentation']
 
-    loss, confidence_threshold_learnt = kld_loss(raw_output, posterior_mu, posterior_logvar, prior_u, flag)
-    _, confidence_threshold_learnt = torch.split(confidence_threshold_learnt, [b_l, b_u], dim=0)
+    loss, confidence_threshold_learnt = kld_loss(raw_output=raw_output,
+                                                 mu1=posterior_mu,
+                                                 logvar1=posterior_logvar,
+                                                 mu2=pri_mu,
+                                                 std2=pri_std,
+                                                 flag_mu1=flag_post_mu,
+                                                 flag_std1=flag_post_std,
+                                                 flag_mu2=flag_pri_mu,
+                                                 flag_std2=flag_pri_std
+                                                 )
+
+    # confidence_threshold_learnt_l, confidence_threshold_learnt_u = torch.split(confidence_threshold_learnt, [b_l, b_u], dim=0)
 
     return {'loss': loss.mean(),
-            'threshold': confidence_threshold_learnt.mean()}
+            'threshold': confidence_threshold_learnt}
 
 
 # confidence mask:

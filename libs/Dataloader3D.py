@@ -125,14 +125,15 @@ class CustomDataset3D(Dataset):
 
 
 def getData3D(data_directory,
-              transpose_dim,
-              train_batchsize=1,
-              data_format='np',
-              contrast_aug=1,
+              transpose_dim=1,
+              num_workers=4,
+              train_batchsize=2,
+              data_format='nii',
+              contrast_aug=0,
               unlabelled=1,
               crop_aug=1,
               output_shape=(128, 128, 128),
-              gaussian_aug=1,
+              gaussian_aug=0
               ):
     '''
     Args:
@@ -211,6 +212,7 @@ def getData3D(data_directory,
 
     train_loader_labelled = data.DataLoader(dataset=train_dataset_labelled,
                                             batch_size=train_batchsize,
+                                            num_workers=num_workers,
                                             shuffle=True,
                                             drop_last=True)
 
@@ -229,6 +231,7 @@ def getData3D(data_directory,
         train_loader_unlabelled = data.DataLoader(dataset=train_dataset_unlabelled,
                                                   batch_size=int(train_batchsize*unlabelled),
                                                   shuffle=True,
+                                                  num_workers=num_workers,
                                                   drop_last=True)
 
         return {'train_data_l': train_dataset_labelled,

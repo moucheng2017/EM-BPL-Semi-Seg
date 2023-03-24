@@ -16,43 +16,102 @@ import numpy as np
 from scipy.ndimage import distance_transform_edt
 
 
-def kld_loss(raw_output, mu, logvar, mu_prior, flag):
+def kld_loss(raw_output,
+             mu1,
+             logvar1,
+             mu2=0.5,
+             std2=0.125,
+             flag_mu1=0,
+             flag_std1=0,
+             flag_mu2=0,
+             flag_std2=1):
+    '''
+    Args:
+        raw_output: raw digits output of predictions
+        mu1: mean of posterior
+        logvar1: log variance of posterior
+        mu2: mean of prior
+        std2: standard deviation of prior
+        flag_mu1: 0: directly learn mean of posterior, 1: estimate the mean of posterior from raw output which is existing prediction confidence
+        flag_std1: 0: directly learn log var of posterior; 1: estimate the standard deviation of posterior from the mean of posterior, hard constraint, given than we know threshold need to be in 0 and 1; 2: use standard deviation of the prior directly
+        flag_mu2: 0: use the predefined mean of prior; 1: dynamic mean of prior, estimated from raw output which is based on existing prediction confidence
+        flag_std2: 0: use predefined standard deviation of prior; 1: estimate the standard deviation of prior from the mean of the prior
 
-    gamma = 2.
+    Returns:
+        loss
+        predicted threshold for binary pseudo labelling
 
-    if flag == 0:
-        # calculate the prior var:
-        prior_std_upper = (1 - mu_prior) / gamma # mean + 2*sigma <= 1.0
-        prior_std_lower = (mu_prior - 0.0) / gamma # mean - 2*sigma >= 0.0
-        prior_std = min(prior_std_lower, prior_std_upper)
-        loss = -0.5*(1 + logvar - 2*math.log(prior_std) - (logvar.exp() + (mu - mu_prior)**2) / prior_std**2).mean()
+    If any issues, please contact: xumoucheng28@gmail.com
 
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        threshold = eps * std + mu
-        if threshold.mean() < (mu_prior - gamma*prior_std) or threshold.mean() > (mu_prior + gamma*prior_std):
-            threshold = mu_prior * torch.ones_like(logvar).cuda()
+    '''
 
-    elif flag == 1:
-        # we approximate the mean and we don't learn the mean but we still learn the std via log var
-        prob = torch.sigmoid(raw_output)
-        mu_prior = prob.mean()
+    gamma = 2. # number of sigmas
 
-        prior_std_upper = (1 - mu_prior) / gamma # mean + 2*sigma <= 1.0
-        prior_std_lower = (mu_prior - 0.0) / gamma # mean - 2*sigma >= 0.0
-        prior_std = min(prior_std_lower, prior_std_upper)
-        loss = -0.5*(1 + logvar - 2*math.log(prior_std) - logvar.exp() / prior_std**2).mean()
-
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        threshold = eps * std + mu_prior
-        if threshold.mean() < (mu_prior - gamma*prior_std) or threshold.mean() > (mu_prior + gamma*prior_std):
-            threshold = mu_prior * torch.ones_like(logvar).cuda()
-
+    if flag_mu1 == 0:
+        # learn the mean of posterior, separately
+        mu1 = F.relu(mu1, inplace=True)
+    elif flag_mu1 == 1:
+        # learn the mean of posterior, from current predictions
+        mu1 = torch.sigmoid(raw_output)
+        mu1 = mu1.mean()
+    elif flag_mu1 == 2:
+        mu1 = mu2
     else:
         raise NotImplementedError
 
-    return loss, threshold
+    if flag_std1 == 0:
+        # learn the variance of posterior
+        log_sigma1 = 0.5*logvar1
+        var1 = torch.exp(logvar1)
+    elif flag_std1 == 1:
+        # DO NOT learn the posterior variance, direct estimation from posterior mean
+        std_upper = (1 - mu1) / gamma  # mean + 2*sigma <= 1.0
+        std_lower = (mu1 - 0.0) / gamma  # mean - 2*sigma >= 0.0
+        sigma1 = min(std_lower, std_upper)
+        var1 = sigma1**2
+        log_sigma1 = 0.5*math.log(var1)
+    elif flag_std1 == 2:
+        # DO NOT learn the posterior variance, use the prior variance
+        var1 = std2**2
+        log_sigma1 = 0.5*math.log(var1)
+    else:
+        raise NotImplementedError
+
+    if flag_mu2 == 0:
+        # mean of prior
+        mu2 = mu2
+    elif flag_mu2 == 1:
+        # dynamic mean of prior, according to the current predictions
+        mu2 = torch.sigmoid(raw_output)
+        mu2 = mu2.mean()
+    else:
+        raise NotImplementedError
+
+    if flag_std2 == 0:
+        # standard deviation of prior
+        sigma2 = std2
+    elif flag_std2 == 1:
+        # estimation of standard deviation of prior from mean of prior
+        prior_std_upper = (1 - mu2) / gamma  # mean + 2*sigma <= 1.0
+        prior_std_lower = (mu2 - 0.0) / gamma  # mean - 2*sigma >= 0.0
+        sigma2 = min(prior_std_lower, prior_std_upper)
+    else:
+        raise NotImplementedError
+
+    var2 = sigma2**2
+    log_sigma2 = math.log(sigma2)
+
+    loss = log_sigma2 - log_sigma1 + 0.5 * (var1 + (mu1 - mu2)**2) / var2 - 0.5
+    loss = torch.mean(torch.sum(loss, dim=-1), dim=0)
+
+    std = torch.exp(0.5 * logvar1)
+    eps = torch.randn_like(std)
+    threshold = eps * std + mu1
+
+    # if threshold.mean() < (mu2 - gamma * sigma2) or threshold.mean() > (mu2 + gamma * sigma2):
+    #     threshold = mu2 * torch.ones_like(logvar1).cuda()
+
+    return loss, threshold.mean()
 
 
 def softmax_helper(x):

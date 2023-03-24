@@ -1,5 +1,9 @@
 ### News
 
+[2023 Mar 23th] New KL loss updated in libs.Loss. The new k-l loss measure k-l distance of any two arbitrary Gaussian dist.
+We added a few flags for the k-l loss, when all flags set up as 0, the k-l loss becomes the one used in our MICCAI paper. 
+You can set up flags to other options to choose to learn mean or std or choose not to learn mean or std.
+
 [2022 Sep 21th] Bayesian Pseudo Label was selected and shortlisted for Young Scientist Award (Best Paper) at MICCAI 2022 main conference (15 finalists / 1825 submissions).
 
 ### Introduction
@@ -60,69 +64,88 @@ path_to_dataset
 Run the following with your own custom yaml config file:
    ```shell
    python main.py \
-   -c config/exp.yaml
+   -c configs/exp.yaml
    ```
-Here is an example of the config yaml file:
+Here is an example of the configuration .yaml file:
 ```
 dataset:
-  name: lungcancer
-  num_workers: 4
-  data_dir: '/SAN/medic/PerceptronHead/data/Task06_Lung' # data directory
-  data_format: 'nii' # use nii for nifti, use npy for numpy
+  name: brain
+  num_workers: 8 
+  data_dir: '/SAN/medic/PerceptronHead/data/Task01_BrainTumour'
+  data_format: 'nii'
 
 logger:
-  tag: 'exp_log'
+  tag: 'cluster_brain'
 
 seed: 1024
 
 model:
-  input_dim: 1 # channel number of the input volume. For example, 1 for CT, 4 for BRATS
-  output_dim: 1 # output channel number, 1 for binary for using Sigmoid
-  width: 8 # number of filters in the first encoder, it doubles in every encoder
-  depth: 3 # number of downsampling encoders
+  input_dim: 4
+  output_dim: 1
+  width: 10
+  depth: 3
 
 train:
   transpose_dim: 1 # use 1 for transposing input if input is in: D x H x W. For example, for Task06_Lung from medicaldecathlon, this should be 1
   optimizer:
     weight_decay: 0.0005
   lr: 0.001
-  iterations: 10000 # number of training iterations, it's worth to mention this is different from epoch
-  batch: 1 # batch size of labelled volumes
+  iterations: 25000 # number of training iterations, it's worth to mention this is different from epoch
+  batch: 2 # batch size of labelled volumes
   temp: 1.0 # temperature scaling on output, default as 1
-  contrast: True # random contrast augmentation
+  contrast: False # random contrast augmentation
   crop_aug: True # random crop augmentation
-  gaussian: True # random gaussian noise augmentation
+  gaussian: False # random gaussian noise augmentation
   new_size_d: 32 # crop size on depth (number of slices)
-  new_size_w: 256 # crop size on width
-  new_size_h: 256 # crop size on height
+  new_size_w: 128 # crop size on width
+  new_size_h: 128 # crop size on height
   batch_u: 1 # this has to be zero in supervised setting, if set up larger than 0, semi-supervised learning will be used
-  mu: 0.5 # prior of the mean of the threshold distribution, we automatically scale the standard deviation, see libs.Loss.kld_loss for details
-  learn_threshold: 1 # 0 for using the original fixed pseudo label, 1 for learning pseudo label threshold
-  threshold_flag: 1 # 0 for the original implementation of bayesian pseudo label, 1 for a simplified implementation which approximates mean and learns the variance
+  pri_mu: 0.7 # mean of prior
+  pri_std: 0.15 # std of prior
+  flag_post_mu: 0 # flag for mean of posterior
+  flag_post_std: 0 # flag for std of posterior
+  flag_pri_mu: 0 # flag for mean of prior
+  flag_pri_std: 0 # flag for std of prior
   alpha: 1.0 # weight on the unsupervised learning part if semi-supervised learning is used
   warmup: 0.1 # ratio between warm-up iterations and total iterations
-  warmup_start: 0.1 # ratio between warm-up starting iteration and total iterations
+  warmup_start: 0.4 # ratio between warm-up starting iteration and total iterations
+  beta: 1 # weight for pseudo supervision loss
+  conf_lower: 0.0 # lower bound for confidence threshold
 
 checkpoint:
   resume: False # resume training or not
   checkpoint_path: '/some/path/to/saved/model' # checkpoint path
 ```
 
-### Different implementations of K-L loss of Bayesian Pseudo Labels:
-There are two implementations of kl loss of the threshold of the pseudo labels. See the exact KL loss implementations in libs.Loss.kld_loss
-1. The original implementation with hyperparameter searching of prior of mean (mu) (MICCAI version). To use the original Bayesian pseudo labels, set up "learn_threshold" as 1
-and "threshold_flag" as 0. The standard deviation prior is approximated as min [(1 - mu_prior) / 3, mu_prior / 3]. 
 
-2. The simplified Bayesian pseudo label without hyperparameter searching of prior of mean (mu). The mu_prior is approximated as Exp[.] of prediction probability. The standard deviation prior
-is still approximated as min [(1 - mu_prior) / 3, mu_prior / 3]. However, this implementation has not been fully tested. 
+### Hyper-parameters of the K-L loss of Bayesian Pseudo Labels
+To use semi-supervised learning, please enable the batch of unlabelled images larger than 0: batch_u: # positive integer. 
+In kl_loss, we now included more flexible controls and different implementations of kl loss of the threshold of the pseudo labels. See the exact KL loss implementations in libs.Loss.kld_loss or kl_loss_test.py
 
-Other alternative implementations with suitable assumptions could also be used to simplify the K-L loss.
+1. To use the original implementation of bayesian pseudo labels from the MICCAI version. set up following flags: 
+   1. flag_post_mu: 0
+   2. flag_post_std: 0
+   3. flag_pri_mu: 0
+   4. flag_pri_std: 0
 
-### On the learnt threshold
-We learn each threshold scalar for each image in the current implementation before we average them across batch. See the output of libs.Train3D.calculate_kl_loss
+2. We provide an alternative of use current model prediction confidence as prior so you don't need to tune pri_mu and pri_std. To test this configuration, please
+set up the following flags as:
+   1. flag_post_mu: 0
+   2. flag_post_std: 0
+   3. flag_pri_mu: 1
+   4. flag_pri_std: 1
+
+3. To use random sampling from prior dist for the threshold, without learning the kl,
+please set up the following flags as:
+   1. flag_post_mu: 2
+   2. flag_post_std: 2
+   3. flag_pri_mu: 0
+   4. flag_pri_std: 0
+
+3. To use supervised learning, simply set up batch_u: 0
 
 ### Example uses:
-This code base has been tested on Task 01 brain tumour data set downloaded from Medical Segmentation Decathlon: http://medicaldecathlon.com/
+This code base has been tested on whole tumour segmentation on Task 01 brain tumour data set downloaded from Medical Segmentation Decathlon: http://medicaldecathlon.com/
 
 ### Citation
 
@@ -137,7 +160,6 @@ If you find our paper or code useful for your research, please consider citing:
 
 ### Questions
 Please contact 'xumoucheng28@gmail.com'
-
 
 ### Ackwnoledgement
 Massive thanks to my amazing colleagues at UCL and GSK including Yukun Zhou, Jin Chen, Marius de Groot, Fred Wilson, Danny Alexander, Neil Oxtoby, Yipeng Hu and Joe Jacob.

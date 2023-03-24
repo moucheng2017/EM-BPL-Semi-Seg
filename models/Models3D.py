@@ -5,10 +5,10 @@ import torch.nn.functional as F
 
 
 class ThresholdNet(nn.Module):
-    def __init__(self, channels=8):
+    def __init__(self, input_channels, output_channels):
         super(ThresholdNet, self).__init__()
-        self.logvar_layer = nn.Linear(channels, channels)
-        self.mu_layer = nn.Linear(channels, channels)
+        self.logvar_layer = nn.Linear(input_channels, output_channels)
+        self.mu_layer = nn.Linear(input_channels, output_channels)
 
     def forward(self, x):
         return self.mu_layer(x), self.logvar_layer(x)
@@ -25,7 +25,7 @@ class UnetBPL3D(nn.Module):
 
         super(UnetBPL3D, self).__init__()
         self.segmentor = Unet3D(in_ch, width, depth, out_ch, norm=norm, side_output=True)
-        self.encoder = ThresholdNet(width*2)
+        self.encoder = ThresholdNet(width*2, 256)
         self.avg_pool = nn.AdaptiveAvgPool3d(1)
 
     # def reparameterize(self, mu, logvar):

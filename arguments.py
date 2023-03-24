@@ -26,7 +26,7 @@ class Namespace(object):
 
     def __getattr__(self, attribute):
 
-        raise AttributeError(f"Can not find {attribute} in namespace. Please write {attribute} in your config file(xxx.yaml)!")
+        raise AttributeError(f"Can not find {attribute} in namespace. Please write {attribute} in your configs file(xxx.yaml)!")
 
 
 def set_deterministic(seed):
@@ -43,10 +43,10 @@ def set_deterministic(seed):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config-file', required=True, type=str, help="xxx.yaml")
+    parser.add_argument('-c', '--configs-file', required=True, type=str, help="xxx.yaml")
     args = parser.parse_args()
 
-    with open(args.config_file, 'r') as f:
+    with open(args.configs_file, 'r') as f:
         for key, value in Namespace(yaml.load(f, Loader=yaml.FullLoader)).__dict__.items():
             vars(args)[key] = value
 

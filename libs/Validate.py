@@ -18,7 +18,7 @@ def validate_base(val_img,
             # forward pass:
             val_img = val_img.unsqueeze(1)
             outputs_dict = model(val_img)
-            val_output = outputs_dict.get('segmentation')
+            val_output = outputs_dict['segmentation']
 
             val_output = torch.sigmoid(val_output)
             val_output = (val_output >= threshold).float()

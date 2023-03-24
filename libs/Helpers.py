@@ -84,10 +84,11 @@ def network_intialisation(args):
         model_name = 'Unet3D_l_' + str(args.train.lr) + \
                      '_b' + str(args.train.batch) + \
                      '_w' + str(args.model.width) + \
+                     '_d' + str(args.model.depth) + \
                      '_i' + str(args.train.iterations) + \
-                     '_crop_d' + str(args.train.new_size_d) + \
-                     '_crop_h' + str(args.train.new_size_h) + \
-                     '_crop_w' + str(args.train.new_size_w)
+                     '_cd' + str(args.train.new_size_d) + \
+                     '_ch' + str(args.train.new_size_h) + \
+                     '_cw' + str(args.train.new_size_w)
 
     else:
         model = UnetBPL3D(in_ch=args.model.input_dim,
@@ -102,9 +103,12 @@ def network_intialisation(args):
                      '_d' + str(args.model.depth) + \
                      '_i' + str(args.train.iterations) + \
                      '_u' + str(args.train.batch_u) + \
-                     '_mu' + str(args.train.mu) + \
-                     '_thresh' + str(args.train.learn_threshold) + \
-                     '_flag' + str(args.train.threshold_flag) + \
+                     '_m2' + str(args.train.pri_mu) + \
+                     '_std2' + str(args.train.pri_std) + \
+                     '_fm1' + str(args.train.flag_post_mu) + \
+                     '_fstd1' + str(args.train.flag_post_std) + \
+                     '_fm2' + str(args.train.flag_pri_mu) + \
+                     '_fstd2' + str(args.train.flag_pri_std) + \
                      '_cd' + str(args.train.new_size_d) + \
                      '_ch' + str(args.train.new_size_h) + \
                      '_cw' + str(args.train.new_size_w)
@@ -130,6 +134,7 @@ def get_iterators(args):
     data_loaders = getData3D(data_directory=args.dataset.data_dir,
                              train_batchsize=args.train.batch,
                              crop_aug=args.train.crop_aug,
+                             num_workers=args.dataset.num_workers,
                              transpose_dim=args.train.transpose_dim,
                              gaussian_aug=args.train.gaussian,
                              data_format=args.dataset.data_format,
@@ -152,7 +157,11 @@ def get_data_dict(dataloader, iterator):
     return data_dict
 
 
-def ramp_up(weight, ratio, step, total_steps, starting):
+def ramp_up(weight,
+            ratio,
+            step,
+            total_steps,
+            starting):
     '''
     Args:
         weight: final target weight value
@@ -165,7 +174,9 @@ def ramp_up(weight, ratio, step, total_steps, starting):
     '''
     # For the 1st 50 steps, the weighting is zero
     # For the ramp-up stage from starting through the length of ramping up, we linearly gradually ramp up the weight
-    ramp_up_length = int(ratio*total_steps)
+    starting = starting*total_steps
+    ramp_up_length = ratio*total_steps
+
     if step < starting:
         return 0.0
     elif step < (ramp_up_length+starting):

@@ -31,7 +31,7 @@ def main(args):
     data_iterators = Helpers.get_iterators(args)
 
     # train labelled:
-    train_labelled_data_loader = data_iterators.get('train_loader_l')
+    train_labelled_data_loader = data_iterators['train_loader_l']
     iterator_train_labelled = iter(train_labelled_data_loader)
 
     # validate labelled:
@@ -39,8 +39,10 @@ def main(args):
 
     if args.train.batch_u > 0:
         # train unlabelled:
-        train_unlabelled_data_loader = data_iterators.get('train_loader_u')
+        train_unlabelled_data_loader = data_iterators['train_loader_u']
         iterator_train_unlabelled = iter(train_unlabelled_data_loader)
+    else:
+        pass
 
     # initialisation of best acc tracker
     best_train = 0.0
@@ -62,30 +64,39 @@ def main(args):
             unlabelled_dict = Helpers.get_data_dict(train_unlabelled_data_loader,
                                                     iterator_train_unlabelled)
 
-            loss_ = train_semi(labelled_img=labelled_dict.get('img'),
-                               labelled_label=labelled_dict.get('lbl'),
-                               unlabelled_img=unlabelled_dict.get('img'),
+            loss_ = train_semi(labelled_img=labelled_dict['img'],
+                               labelled_label=labelled_dict['lbl'],
+                               unlabelled_img=unlabelled_dict['img'],
                                model=model,
                                t=args.train.temp,
-                               prior_mu=args.train.mu,
-                               learn_threshold=args.train.learn_threshold,
-                               flag=args.train.threshold_flag)
+                               pri_mu=args.train.pri_mu,
+                               pri_std=args.train.pri_std,
+                               flag_post_mu=args.train.flag_post_mu,
+                               flag_post_std=args.train.flag_post_std,
+                               flag_pri_mu=args.train.flag_pri_mu,
+                               flag_pri_std=args.train.flag_pri_std)
 
-            sup_loss = loss_.get('supervised losses').get('loss').mean()
-            pseudo_loss = 0.1*current_alpha*loss_.get('pseudo losses').get('loss').mean()
-            kl_loss = 0.1*current_alpha*loss_.get('kl losses').get('loss').mean()
-            loss = sup_loss + pseudo_loss + kl_loss
+            sup_loss = loss_['supervised losses']['loss'].mean()
+            pseudo_loss = args.train.beta * current_alpha * loss_['pseudo losses']['loss'].mean()
+
+            if (pseudo_loss > 0.0) and (1.0 > loss_['kl losses']['threshold'] > args.train.conf_lower):
+                kl_loss = 0.1 * current_alpha*loss_['kl losses']['loss'].mean()
+                loss = sup_loss + pseudo_loss + kl_loss
+            else:
+                kl_loss = torch.zeros(1).cuda()
+                pseudo_loss = torch.zeros(1).cuda()
+                loss = sup_loss
 
         else:
-            loss_ = train_sup(labelled_img=labelled_dict.get('img'),
-                              labelled_label=labelled_dict.get('lbl'),
+            loss_ = train_sup(labelled_img=labelled_dict['img'],
+                              labelled_label=labelled_dict['lbl'],
                               model=model,
                               t=args.train.temp)
 
             sup_loss = loss_['supervised losses']['loss'].mean()
             loss = sup_loss
 
-        train_iou = loss_.get('supervised losses').get('train iou')
+        train_iou = loss_['supervised losses']['train iou']
 
         del labelled_dict
 
@@ -101,38 +112,51 @@ def main(args):
                 print(
                     'Step [{}/{}], '
                     'lr: {:.4f},'
-                    'train iou: {:.4f},'
-                    'loss: {:.4f}, '
-                    'pseudo loss: {:.4f}, '
+                    'iou: {:.4f},'
+                    'sup loss: {:.4f}, '
+                    'pse loss: {:.4f}, '
                     'kl loss: {:.4f}, '
-                    'Threshold: {:.4f}'.format(step + 1,
-                                               args.train.iterations,
-                                               optimizer.param_groups[0]["lr"],
-                                               train_iou,
-                                               sup_loss.item(),
-                                               pseudo_loss.item(),
-                                               kl_loss.item(),
-                                               loss_['kl losses']['threshold'])
-                )
+                    'Threshold: {:.4f}, '
+                    'prob l: {:.4f}, '
+                    'prob u: {:.4f}'.format(step + 1,
+                                            args.train.iterations,
+                                            optimizer.param_groups[0]["lr"],
+                                            train_iou,
+                                            sup_loss.item(),
+                                            pseudo_loss.item(),
+                                            kl_loss.item(),
+                                            loss_['kl losses']['threshold'],
+                                            loss_['supervised losses']['prob'],
+                                            loss_['pseudo losses']['prob']
+                                            ))
 
                 writer.add_scalars('ious', {'train iu': train_iou}, step + 1)
+
                 writer.add_scalars('loss metrics', {'train seg loss': sup_loss,
-                                                    'learnt threshold': loss_['kl losses']['threshold'],
                                                     'train kl loss': kl_loss.item(),
                                                     'train pseudo loss': pseudo_loss}, step + 1)
+
+                writer.add_scalars('probabilities', {'learnt threshold': loss_['kl losses']['threshold'],
+                                                     'prob mean labelled': loss_['supervised losses']['prob'],
+                                                     'prob mean unlabelled': loss_['pseudo losses']['prob']}, step + 1)
+
             else:
                 print(
                     'Step [{}/{}], '
                     'lr: {:.4f},'
-                    'train iou: {:.4f},'
-                    'Train loss: {:.4f}, '.format(step + 1,
-                                                  args.train.iterations,
-                                                  optimizer.param_groups[0]["lr"],
-                                                  train_iou,
-                                                  loss))
+                    'iou: {:.4f},'
+                    'sup loss: {:.4f}, '.format(step + 1,
+                                                args.train.iterations,
+                                                optimizer.param_groups[0]["lr"],
+                                                train_iou,
+                                                loss))
 
                 writer.add_scalars('loss metrics', {'train loss': loss.item()}, step + 1)
                 writer.add_scalars('ious', {'train iu': train_iou}, step + 1)
+                writer.add_scalars('probabilities', {'prob mean labelled': loss_['supervised losses']['prob']}, step + 1)
+
+        else:
+            pass
 
         save_model_name_full = saved_model_path + '/' + model_name + '_current.pt'
         torch.save(model, save_model_name_full)
