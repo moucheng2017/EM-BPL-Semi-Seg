@@ -1,0 +1,54 @@
+dataset:
+  name: brain
+  num_workers: 8
+  data_dir: '/SAN/medic/PerceptronHead/data/Task01_BrainTumour'
+  data_format: 'nii'
+
+logger:
+  tag: 'cluster_brain'
+
+seed: 1024
+
+model:
+  input_dim: 4
+  output_dim: 1
+  width: 10
+  depth: 3
+
+train:
+  transpose_dim: 1 # use 1 for transposing input if input is in: D x H x W. For example, for Task06_Lung from medicaldecathlon, this should be 1
+  optimizer:
+    weight_decay: 0.0005
+  lr: 0.001
+  iterations: 25000 # number of training iterations, it's worth to mention this is different from epoch
+  batch: 2 # batch size of labelled volumes
+  temp: 1.0 # temperature scaling on output, default as 1
+  contrast: False # random contrast augmentation
+  crop_aug: True # random crop augmentation
+  gaussian: False # random gaussian noise augmentation
+  new_size_d: 32 # crop size on depth (number of slices)
+  new_size_w: 128 # crop size on width
+  new_size_h: 128 # crop size on height
+  batch_u: 1 # this has to be zero in supervised setting, if set up larger than 0, semi-supervised learning will be used
+  pri_mu: 0.5 # mean of prior
+  pri_std: 0.1 # std of prior
+  flag_post_mu: 0 # flag for mean of posterior
+  flag_post_std: 0 # flag for std of posterior
+  flag_pri_mu: 0 # flag for mean of prior
+  flag_pri_std: 0 # flag for std of prior
+  alpha: 1.0 # weight on the unsupervised learning part if semi-supervised learning is used
+  warmup: 0.1 # ratio between warm-up iterations and total iterations
+  warmup_start: 0.4 # ratio between warm-up starting iteration and total iterations
+  beta: 1 # weight for pseudo supervision loss
+  conf_lower: 0.0 # lower bound for confidence threshold
+
+checkpoint:
+  resume: False # resume training or not
+  checkpoint_path: '/some/path/to/saved/model' # checkpoint path
+
+
+
+
+
+
+

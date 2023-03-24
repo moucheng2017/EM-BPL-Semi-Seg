@@ -5,4 +5,6 @@
 #$ -l h_rt=96:00:00
 #$ -wd /SAN/medic/PerceptronHead/codes/SatsumaSeg/
 
-~/miniconda3/envs/pytorch1.4/bin/python Main.py -c configs/exp.yaml
+git checkout 02_exps_brain
+
+~/miniconda3/envs/pytorch1.4/bin/python Main.py -c configs/brain2.yaml
