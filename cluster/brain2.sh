@@ -3,7 +3,7 @@
 #$ -S /bin/bash
 #$ -j y
 #$ -l h_rt=96:00:00
-#$ -wd /SAN/medic/PerceptronHead/codes/SatsumaSeg/
+#$ -wd /SAN/medic/PerceptronHead/codes/EMSSL/
 
 git checkout 02_exps_brain
 
