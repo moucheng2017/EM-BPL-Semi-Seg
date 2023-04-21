@@ -5,7 +5,7 @@ dataset:
   data_format: 'nii'
 
 logger:
-  tag: 'bpl_v1_pri_0.9'
+  tag: 'bpl_v1_pri_0.9_exp'
 
 seed: 1024
 

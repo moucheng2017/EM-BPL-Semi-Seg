@@ -103,12 +103,12 @@ def network_intialisation(args):
                      '_d' + str(args.model.depth) + \
                      '_i' + str(args.train.iterations) + \
                      '_u' + str(args.train.batch_u) + \
-                     '_m2' + str(args.train.pri_mu) + \
-                     '_std2' + str(args.train.pri_std) + \
-                     '_fm1' + str(args.train.flag_post_mu) + \
-                     '_fstd1' + str(args.train.flag_post_std) + \
-                     '_fm2' + str(args.train.flag_pri_mu) + \
-                     '_fstd2' + str(args.train.flag_pri_std) + \
+                     '_m2_' + str(args.train.pri_mu) + \
+                     '_std2_' + str(args.train.pri_std) + \
+                     '_fm1_' + str(args.train.flag_post_mu) + \
+                     '_fstd1_' + str(args.train.flag_post_std) + \
+                     '_fm2_' + str(args.train.flag_pri_mu) + \
+                     '_fstd2_' + str(args.train.flag_pri_std) + \
                      '_cd' + str(args.train.new_size_d) + \
                      '_ch' + str(args.train.new_size_h) + \
                      '_cw' + str(args.train.new_size_w)
