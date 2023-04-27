@@ -5,7 +5,7 @@ dataset:
   data_format: 'nii'
 
 logger:
-  tag: 'bpl_v1_pri_0.9_exp02'
+  tag: 'bpl_v1_pri_0.9_exp03'
 
 seed: 1024
 
@@ -20,7 +20,7 @@ train:
   optimizer:
     weight_decay: 0.0005
   lr: 0.001
-  iterations: 25000 # number of training iterations, it's worth to mention this is different from epoch
+  iterations: 50000 # number of training iterations, it's worth to mention this is different from epoch
   batch: 2 # batch size of labelled volumes
   temp: 1.0 # temperature scaling on output, default as 1
   contrast: False # random contrast augmentation
@@ -37,8 +37,8 @@ train:
   flag_pri_mu: 0 # flag for mean of prior
   flag_pri_std: 0 # flag for std of prior
   alpha: 1.0 # weight on the unsupervised learning part if semi-supervised learning is used
-  warmup: 0.1 # ratio between warm-up iterations and total iterations
-  warmup_start: 0.4 # ratio between warm-up starting iteration and total iterations
+  warmup: 0.01 # ratio between warm-up iterations and total iterations
+  warmup_start: 0.02 # ratio between warm-up starting iteration and total iterations
   beta: 1 # weight for pseudo supervision loss
   conf_lower: 0.0 # lower bound for confidence threshold
 

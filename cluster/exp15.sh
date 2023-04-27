@@ -4,4 +4,4 @@
 #$ -j y
 #$ -wd /SAN/medic/PerceptronHead/codes/EMSSL/
 
-~/miniconda3/envs/pytorch1.4/bin/python Main.py -c configs/exp14.yaml
+~/miniconda3/envs/pytorch1.4/bin/python Main.py -c configs/exp15.yaml
