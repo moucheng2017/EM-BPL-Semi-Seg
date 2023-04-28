@@ -1,6 +1,6 @@
 dataset:
   name: brain
-  num_workers: 8
+  num_workers: 16
   data_dir: '/SAN/medic/PerceptronHead/data/Task01_BrainTumour'
   data_format: 'nii'
 
