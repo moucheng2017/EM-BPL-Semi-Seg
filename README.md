@@ -1,5 +1,7 @@
 ### News
 
+[2023 May 1st] A journal extension has been released here: https://arxiv.org/abs/2305.01747
+
 [2023 Mar 23th] New KL loss updated in libs.Loss. The new k-l loss measure k-l distance of any two arbitrary Gaussian dist.
 We added a few flags for the k-l loss, when all flags set up as 0, the k-l loss becomes the one used in our MICCAI paper. 
 You can set up flags to other options to choose to learn mean or std or choose not to learn mean or std.
