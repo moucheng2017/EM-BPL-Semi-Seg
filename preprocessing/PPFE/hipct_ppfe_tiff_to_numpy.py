@@ -1,5 +1,8 @@
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 from libs.Augmentations import *
 from PIL import Image
 

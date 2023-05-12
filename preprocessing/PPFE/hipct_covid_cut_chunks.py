@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pathlib
 import sys
-sys.path.append('..')
+sys.path.append('../..')
 from libs.Augmentations import norm95
 
 
