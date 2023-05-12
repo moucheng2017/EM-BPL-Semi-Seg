@@ -29,7 +29,7 @@ train:
   new_size_d: 128 # crop size on depth (number of slices)
   new_size_w: 224 # crop size on width
   new_size_h: 224 # crop size on height
-  batch_u: 8 # this has to be zero in supervised setting, if set up larger than 0, semi-supervised learning will be used
+  batch_u: 6 # this has to be zero in supervised setting, if set up larger than 0, semi-supervised learning will be used
   pri_mu: 0.9 # mean of prior
   pri_std: 0.1 # std of prior
   flag_post_mu: 0 # flag for mean of posterior
