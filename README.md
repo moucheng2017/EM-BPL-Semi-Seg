@@ -159,6 +159,12 @@ If you find our paper or code useful for your research, please consider citing:
          booktitle = {International Conference on Medical Image Computing and Computer Assisted Interventions (MICCAI)},
          year = {2022} }
 
+    @inproceedings{xu2024bpl,
+         title={Expectation Maximization Pseudo Labels},
+         author={Xu, Moucheng and Zhou, Yukun and Jin, Chen and deGroot, Marius and Alexander, Daniel C. and Oxtoby, Neil P. and Hu, Yipeng and Jacob, Joseph},
+         booktitle = {Medical Image Analysis},
+         year = {2022} }
+
 
 ### Questions
 Please contact 'xumoucheng28@gmail.com'
