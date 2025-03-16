@@ -25,7 +25,7 @@ def calculate_sup_loss(lbl,
     else:
         raise NotImplementedError
 
-    if lbl.sum() > 0.0005*vol: # at least 0.5% foreground
+    if lbl.sum() > 0.005*vol: # at least 0.5% foreground
         loss_sup = 0.5*SoftDiceLoss()(prob_output, lbl) + 0.5*F.binary_cross_entropy_with_logits(raw_output, lbl)
     else:
         loss_sup = torch.zeros(1).cuda()
@@ -124,7 +124,7 @@ def calculate_pseudo_loss(raw_output,
     else:
         raise NotImplementedError
 
-    if pseudo_labels.sum() > 0.0005*vol:
+    if pseudo_labels.sum() > 0.005*vol:
         loss_unsup = 0.5*SoftDiceLoss()(prob_output, pseudo_labels)
         loss_unsup += 0.5*F.binary_cross_entropy_with_logits(raw_output, pseudo_labels)
     else:
@@ -192,76 +192,7 @@ def calculate_kl_loss(outputs_dict,
             'threshold': confidence_threshold_learnt}
 
 
-# confidence mask:
-    # mask = prob_output.ge(0.95)
-    # mask the labels:
-    # prob_output_selected = prob_output*mask
-    # raw_output_selected = raw_output*mask
-    # pseudo_label_selected = pseudo_label*mask
-    # print(pseudo_label_selected.size())
-    # print(raw_output_selected.size())
 
-
-# def calculate_pseudo_loss(outputs_dict,
-#                           b_u,
-#                           b_l,
-#                           temp,
-#                           lbl,
-#                           cutout_aug=0,
-#                           conf_threshold='bayesian'):
-#
-#     assert b_u > 0
-#     predictions_all = outputs_dict.get('segmentation')
-#
-#     # Monte Carlo sampling of confidence threshold:
-#     if conf_threshold == 'bayesian':
-#         threshold = outputs_dict.get('learnt_threshold')
-#     else:
-#         threshold = 0.5
-#
-#     predictions_l, predictions_u = torch.split(predictions_all, [b_l, b_u], dim=0)
-#     threshold_l, threshold_u = torch.split(threshold, [b_l, b_u], dim=0)
-#     prob_output_u = torch.softmax(predictions_u / temp, dim=1)
-#     pseudo_label_u = (prob_output_u >= threshold_u).float()
-#     prob_output_l = torch.softmax(predictions_l / temp, dim=1)
-#     pseudo_label_l = (prob_output_l >= threshold_l).float()
-#
-#     # if cutout_aug == 1:
-#     #     prob_output_u, pseudo_label_u = randomcutout(prob_output_u, pseudo_label_u)
-#
-#     mask = torch.zeros_like(lbl)
-#
-#     if torch.sum(pseudo_label_u) > 10:
-#         if len(prob_output_u.size()) == 3:
-#             # this is binary segmentation
-#             loss = SoftDiceLoss()(prob_output_u, pseudo_label_u) + nn.BCELoss(reduction='mean')(prob_output_u.squeeze() + 1e-10, pseudo_label_u.squeeze() + 1e-10)
-#             loss += 0.5*SoftDiceLoss()(prob_output_l, pseudo_label_l) + nn.BCELoss(reduction='mean')(prob_output_l.squeeze() + 1e-10, pseudo_label_l.squeeze() + 1e-10)
-#             return {'loss': loss.mean()}
-#
-#         elif len(prob_output_u.size()) == 4:
-#             if prob_output_u.size()[1] == 1:
-#                 # this is also binary segmentation
-#                 loss = SoftDiceLoss()(prob_output_u, pseudo_label_u) + nn.BCELoss(reduction='mean')(prob_output_u.squeeze() + 1e-10, pseudo_label_u.squeeze() + 1e-10)
-#                 loss += 0.5*SoftDiceLoss()(prob_output_l, pseudo_label_l) + nn.BCELoss(reduction='mean')(prob_output_l.squeeze() + 1e-10, pseudo_label_l.squeeze() + 1e-10)
-#                 return {'loss': loss.mean()}
-#
-#             else:
-#                 # this is multi class segmentation
-#                 pseudo_label_u = multi_class_label_processing(pseudo_label_u, prob_output_u.size()[1])  # convert single channel multi integer class label to multi channel binary label
-#                 loss = torch.tensor(0).to('cuda')
-#                 effective_classes = 0
-#                 for i in range(prob_output_u.size()[1]):  # multiple
-#                     if torch.sum(pseudo_label_u[:, i, :, :]) > 10.0:
-#                         # If the channel is not empty, we learn it otherwise we ignore that channel because sometimes we do learn some very weird stuff
-#                         # It is necessary to use this condition because some labels do not necessarily contain all of the classes in one image.
-#                         effective_classes += 1
-#                         loss += SoftDiceLoss()(prob_output_u[:, i, :, :], pseudo_label_u[:, i, :, :]).mean() + nn.BCELoss(reduction='mean')(prob_output_u[:, i, :, :].squeeze() + 1e-10, pseudo_label_u[:, i, :, :].squeeze() + 1e-10).mean()
-#                         loss += 0.5*SoftDiceLoss()(prob_output_l[:, i, :, :], pseudo_label_l[:, i, :, :]).mean() + nn.BCELoss(reduction='mean')(prob_output_l[:, i, :, :].squeeze() + 1e-10, pseudo_label_l[:, i, :, :].squeeze() + 1e-10).mean()
-#                 loss = loss / effective_classes
-#                 return {'loss': loss.mean()}
-#
-#     else:
-#         return {'loss': torch.tensor(0.0).to('cuda').mean()}
 
 
 
