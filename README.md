@@ -1,6 +1,6 @@
 ### News
 
-[2023 May 1st] A journal extension has been released here: https://arxiv.org/abs/2305.01747
+[2024 May 1st] A journal extension has been published at Medical Image Analysis: [Expectation Maximization Pseudo Labels](https://www.sciencedirect.com/science/article/pii/S1361841524000501)
 
 [2023 Mar 23th] New KL loss updated in libs.Loss. The new k-l loss measure k-l distance of any two arbitrary Gaussian dist.
 We added a few flags for the k-l loss, when all flags set up as 0, the k-l loss becomes the one used in our MICCAI paper. 
