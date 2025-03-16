@@ -1,45 +1,29 @@
-### News
-
-[2024 May 1st] A journal extension has been published at Medical Image Analysis: [Expectation Maximization Pseudo Labels](https://www.sciencedirect.com/science/article/pii/S1361841524000501)
-
-[2023 Mar 23th] New KL loss updated in libs.Loss. The new k-l loss measure k-l distance of any two arbitrary Gaussian dist.
-We added a few flags for the k-l loss, when all flags set up as 0, the k-l loss becomes the one used in our MICCAI paper. 
-You can set up flags to other options to choose to learn mean or std or choose not to learn mean or std.
-
-[2022 Sep 21th] Bayesian Pseudo Label was selected and shortlisted for Young Scientist Award (Best Paper) at MICCAI 2022 main conference (15 finalists / 1825 submissions).
-
 ### Introduction
-This repository is an exampler implementation of our MICCAI 2022 paper on 3D binary segmentation (Runner-up for the best paper (Young Scientist Award)) '[Bayesian Pseudo Labels: Expectation Maximization and Maximization for Robust and Efficient Semi-Supervised Segmentation](https://arxiv.org/abs/2208.04435)'. This code base was written and maintained by [Moucheng Xu](https://moucheng2017.github.io/)
+This repository contains an implementation of the MICCAI 2022 Young Scientist Award Finalist paper '[Bayesian Pseudo Labels: Expectation Maximization and Maximization for Robust and Efficient Semi-Supervised Segmentation](https://conferences.miccai.org/2022/papers/066-Paper2505.html)', and its journal extension '[Expectation Maximization Pseudo Labels](https://www.sciencedirect.com/science/article/pii/S1361841524000501)'. This code base was written by [Moucheng Xu](https://moucheng2017.github.io/).
+
+### Abstract:
+We study pseudo-labelling. Pseudo-labelling employs raw inferences on unlabelled data as pseudo-labels for self-training. We elucidate the empirical successes of pseudo-labelling by establishing a link between this technique and the Expectation Maximisation algorithm. Through this, we realise that the original pseudo-labelling serves as an empirical estimation of its more comprehensive underlying formulation. Following this insight, we present a full generalisation of pseudo-labels under Bayes’ theorem, termed Bayesian Pseudo Labels. Subsequently, we introduce a variational approach to generate these Bayesian Pseudo Labels, involving the learning of a threshold to automatically select high-quality pseudo labels. In the remainder of the paper, we showcase the applications of pseudo-labelling and its generalised form, Bayesian Pseudo-Labelling, in the semi-supervised segmentation of medical images. Specifically, we focus on: (1) 3D binary segmentation of lung vessels from CT volumes; (2) 2D multi-class segmentation of brain tumours from MRI volumes; (3) 3D binary segmentation of whole brain tumours from MRI volumes; and (4) 3D binary segmentation of prostate from MRI volumes. We further demonstrate that pseudo-labels can enhance the robustness of the learned representations.
 
 ### Pseudo Labelling as Expectation Maximization (EM)
-We focus on binary case here that output of a network model is single channel and normalised by Sigmoid function. 
-We first see pseudo labels as latent variables of a graphical model. 
-The original pseudo labelling is an empirical estimation of E-step for estimating the latent variables, updating model parameter using pseudo labells is the M-step.
-We further simplify the graphical model by using only the confidence threshold as a latent variable.
-See the illustration below:
-
+We revisit pseudo labelling as a latent variable model. The original pseudo labelling is an empirical estimation of E-step for estimating the latent variables (pseudo labels), updating model parameters using pseudo labells is the M-step.
+We further simplify the graphical model by using only the confidence threshold as a latent variable in the later section. More details of the proposed graphic model can be found in our paper '[Expectation Maximization Pseudo Labels](https://www.sciencedirect.com/science/article/pii/S1361841524000501)':
 ![](pics/main_method.png "Plot.")
 
 
 ### Bayesian Pseudo Labels
-Bayesian pseudo label (BPL) is a probabilistic generalisation of pseudo labelling via Bayes rule. Because the full E-step is intractable (more details in our paper), BPL estimates the maximum likelihood of labels of unlabelled data with variational inference. The comparison between Bayesian pseudo label and Variational auto encoder is illustrated beneath: 
-
-![](pics/BPL_VAE.png "Plot.")
-
-The two key differences between BPL and VAE are: 1) BPL has only one latent variable which has a clear prior, while VAE has high dimensional latent variables without a clear prior; 2) VAE does MAP estimation of reconstruction of input image, while BPL does MAP estimation of unseen label of input image.
+We propose Bayesian pseudo-labels, a probabilistic generalization of standard pseudo-labels. In binary segmentation, standard pseudo-labels are generated by binarizing network inferences (after applying the sigmoid function) using a fixed confidence threshold, typically 0.5. Our Bayesian pseudo-label learns an optimal threshold for unlabeled data through variational inference.
+![](pics/network.png "Plot.")
 
 
-## Exemplar Results
-The beneath table is the results on binary segmentation of whole tumour using Task01 Brain Tumour. We use the first 8 cases from the original training data
-as labelled training cases and the rest as testing data, we use the original unlabelled testing data as unlabelled training data.
-
+### Exemplar Results on binary segmentation of whole tumour using Task01 Brain Tumour
+We use the first 8 cases from the original training data from Task01 from [Medical Decathlon](http://medicaldecathlon.com/), as labelled training cases and the rest as the testing data. We use the original unlabelled testing data as unlabelled training data.
 | Test Sizing | 32^3  | 64^3  | 96^3  | 128^3 |
 |-------------|-------|-------|-------|-------|
 | Superivsed  | 61.07 | 66.94 | 70.13 | 72.09 |
 | SegPL-VI    | 64.44 | 71.43 | 73.07 | 74.48 |
 
-The beneath picture is a plot of the learnt threshold with a prior of an univariate Gaussian (mean=0.5, std=0.16). X-axis: training iterations; Y-axis: threshold. 
-![](pics/learnt_threshold.png)
+The beneath picture is a plot of the learnt threshold with a prior of an univariate Gaussian (mean=0.9, std=0.1) on the unlabelled data of Task01 Brain Tumour. X-axis: training iterations; Y-axis: threshold. 
+![](pics/task01.png)
 
 ### Installation 
 This repository is based on PyTorch 1.4. To use this code, please first clone the repo and install the enviroment.
@@ -150,8 +134,7 @@ please set up the following flags as:
 This code base has been tested on whole tumour segmentation on Task 01 brain tumour data set downloaded from Medical Segmentation Decathlon: http://medicaldecathlon.com/
 
 ### Citation
-
-If you find our paper or code useful for your research, please consider citing:
+If you find our paper or code useful for your research, please consider citing us. Thank you!
 
     @inproceedings{xu2022bpl,
          title={Bayesian Pseudo Labels: Expectation Maximization and Maximization for Robust and Efficient Semi-Supervised Segmentation},
@@ -170,7 +153,7 @@ If you find our paper or code useful for your research, please consider citing:
 
 
 ### Questions
-Please contact 'xumoucheng28@gmail.com'
+Please contact 'xumoucheng28@gmail.com' for any questions.
 
 ### Ackwnoledgement
 Massive thanks to my amazing colleagues at UCL and GSK including Yukun Zhou, Jin Chen, Marius de Groot, Fred Wilson, Danny Alexander, Neil Oxtoby, Yipeng Hu and Joe Jacob.
