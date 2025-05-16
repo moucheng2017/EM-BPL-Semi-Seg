@@ -1,5 +1,5 @@
 # Summary
-This repository contains an implementation of the MICCAI 2022 Young Scientist Award Finalist paper '[Bayesian Pseudo Labels: Expectation Maximization and Maximization for Robust and Efficient Semi-Supervised Segmentation](https://conferences.miccai.org/2022/papers/066-Paper2505.html)', and its journal extension '[Expectation Maximization Pseudo Labels](https://www.sciencedirect.com/science/article/pii/S1361841524000501)'. This code base was written by [Moucheng Xu](https://moucheng2017.github.io/).
+This repository contains an implementation of the MICCAI 2022 Young Scientist Award (Best paper) Finalist paper '[Bayesian Pseudo Labels: Expectation Maximization and Maximization for Robust and Efficient Semi-Supervised Segmentation](https://conferences.miccai.org/2022/papers/066-Paper2505.html)', and its journal extension '[Expectation Maximization Pseudo Labels](https://www.sciencedirect.com/science/article/pii/S1361841524000501)'. This code base was written by [Moucheng Xu](https://moucheng2017.github.io/).
 
 
 # Pseudo Labelling as Expectation Maximization (EM)
